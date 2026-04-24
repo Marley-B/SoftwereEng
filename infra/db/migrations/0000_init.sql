@@ -1,0 +1,2 @@
+-- Placeholder migration file for initial schema setup.
+-- Add table definitions during implementation phase.
