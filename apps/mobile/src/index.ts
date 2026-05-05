@@ -1,5 +1,5 @@
-/**
- * Mobile app bootstrap placeholder.
- * Feature screens/routes will be added in implementation phase.
- */
-export {};
+import { registerRootComponent } from "expo";
+
+import { App } from "./App";
+
+registerRootComponent(App);
