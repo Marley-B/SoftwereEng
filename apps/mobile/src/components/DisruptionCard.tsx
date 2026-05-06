@@ -39,9 +39,10 @@ const formatTime = (isoString: string): string => {
 
 interface DisruptionCardProps {
   disruption: Disruption;
+  affectedRoutes?: string;
 }
 
-export function DisruptionCard({ disruption }: DisruptionCardProps) {
+export function DisruptionCard({ disruption, affectedRoutes }: DisruptionCardProps) {
   return (
     <View
       style={[
@@ -80,6 +81,9 @@ export function DisruptionCard({ disruption }: DisruptionCardProps) {
 
       <View style={styles.footer}>
         <Text style={styles.location}>📍 {disruption.location}</Text>
+        {affectedRoutes && (
+          <Text style={styles.affectedRoutes}>🛣️ {affectedRoutes}</Text>
+        )}
         {disruption.affectedRoute && (
           <Text style={styles.affectedRoute}>🛣️ {disruption.affectedRoute}</Text>
         )}
@@ -145,6 +149,11 @@ const styles = StyleSheet.create({
   location: {
     fontSize: 13,
     color: "#666",
+  },
+  affectedRoutes: {
+    fontSize: 13,
+    color: "#007AFF",
+    fontWeight: "500",
   },
   affectedRoute: {
     fontSize: 13,
