@@ -17,8 +17,39 @@ function calculateArrivalTime(estimatedMinutes: number): string {
   });
 }
 
+function calculateStartTime(arrivalTime: string, estimatedMinutes: number): string {
+  const [hoursStr, minutesStr] = arrivalTime.split(":");
+  if (!hoursStr || !minutesStr) {
+    return "";
+  }
+
+  const hours = parseInt(hoursStr, 10);
+  const minutes = parseInt(minutesStr, 10);
+
+  if (
+    Number.isNaN(hours) ||
+    Number.isNaN(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return "";
+  }
+
+  const arrivalDate = new Date();
+  arrivalDate.setHours(hours, minutes, 0, 0);
+  const start = new Date(arrivalDate.getTime() - estimatedMinutes * 60000);
+
+  return start.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 type RouteItemProps = {
-  route: Route;
+  route: Route & { desiredArrivalTime?: string };
   onDelete?: (routeId: string) => void;
 };
 
@@ -36,10 +67,10 @@ export function RouteItem({ route, onDelete }: RouteItemProps) {
       >
         <View style={styles.headerRow}>
           <View style={styles.infoSection}>
-            <Text style={styles.routeName}>{route.name}</Text>
-            <Text style={styles.eta}>
-              ⏱️ {route.estimatedArrivalTime} min • Arrives: {calculateArrivalTime(route.estimatedArrivalTime)}
+            <Text style={styles.arrivalBy}>
+              Arrive by {route.desiredArrivalTime ?? calculateArrivalTime(route.estimatedArrivalTime)}
             </Text>
+            <Text style={styles.routeName}>{route.name}</Text>
           </View>
           <Text style={styles.chevron}>
             {isExpanded ? "▼" : "▶"}
@@ -62,6 +93,16 @@ export function RouteItem({ route, onDelete }: RouteItemProps) {
               </Text>
             </View>
 
+            <Text style={styles.routeInfo}>⏱️ Estimated duration: {route.estimatedArrivalTime} min</Text>
+            {route.desiredArrivalTime ? (
+              <Text style={styles.routeInfo}>
+                🚦 Start by: {calculateStartTime(route.desiredArrivalTime, route.estimatedArrivalTime)}
+              </Text>
+            ) : (
+              <Text style={styles.routeInfo}>
+                Arrives in {route.estimatedArrivalTime} min from now
+              </Text>
+            )}
             <View style={styles.actionButtons}>
               <Pressable
                 onPress={() => onDelete?.(route.id)}
@@ -117,10 +158,21 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
+  arrivalBy: {
+    color: "#374151",
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
   eta: {
     color: "#6b7280",
     fontSize: 13,
     marginTop: 4,
+  },
+  routeInfo: {
+    color: "#4b5563",
+    fontSize: 13,
+    marginBottom: 8,
   },
   expandedContent: {
     borderTopColor: "#e5e7eb",
