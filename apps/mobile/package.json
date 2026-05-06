@@ -11,10 +11,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@babel/runtime": "^7.24.0",
     "@expo/metro-runtime": "~4.0.0",
     "@route-helper/shared": "*",
     "expo": "~52.0.0",
-    "expo-asset": "~9.0.0",
+    "expo-asset": "~11.0.5",
     "expo-router": "~4.0.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
