@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Helper - Alertas de Disrupciones</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #fff;
+            padding: 16px;
+            border-bottom: 1px solid #e0e0e0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .container {
+            padding: 12px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 4px solid;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .card.high {
+            border-left-color: #FF3B30;
+        }
+        .card.medium {
+            border-left-color: #FF9500;
+        }
+        .card.low {
+            border-left-color: #FFC200;
+        }
+        .card-header {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: flex-start;
+        }
+        .card-icon {
+            font-size: 24px;
+            margin-top: 2px;
+        }
+        .card-header-content {
+            flex: 1;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .card-time {
+            font-size: 12px;
+            color: #666;
+        }
+        .severity-badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .severity-high {
+            background-color: #FF3B30;
+        }
+        .severity-medium {
+            background-color: #FF9500;
+        }
+        .severity-low {
+            background-color: #FFC200;
+        }
+        .card-description {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 12px;
+            line-height: 20px;
+        }
+        .card-footer {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .card-location {
+            font-size: 13px;
+            color: #666;
+        }
+        .card-route {
+            font-size: 13px;
+            color: #007AFF;
+            font-weight: 500;
+        }
+        .refresh-btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 16px;
+            width: 100%;
+        }
+        .refresh-btn:active {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Alertas de Disrupciones</h1>
+    </div>
+    
+    <div class="container">
+        <button class="refresh-btn">↻ Actualizar</button>
+        
+        <div class="card high">
+            <div class="card-header">
+                <div class="card-icon">⏱️</div>
+                <div class="card-header-content">
+                    <div class="card-title">Retraso en L3 (Metro)</div>
+                    <div class="card-time">Desde 10:30 · Hasta 11:00</div>
+                </div>
+                <div class="severity-badge severity-high">Alto</div>
+            </div>
+            <div class="card-description">
+                Problema técnico en la línea L3. Se espera normalización en 15 minutos.
+            </div>
+            <div class="card-footer">
+                <div class="card-location">📍 Estació de Sants</div>
+                <div class="card-route">🛣️ Estació de Sants → Plaça Catalunya</div>
+            </div>
+        </div>
+
+        <div class="card medium">
+            <div class="card-header">
+                <div class="card-icon">🚫</div>
+                <div class="card-header-content">
+                    <div class="card-title">Cierre de carril en Av. Diagonal</div>
+                    <div class="card-time">Desde 08:00 · Hasta 19:00</div>
+                </div>
+                <div class="severity-badge severity-medium">Medio</div>
+            </div>
+            <div class="card-description">
+                Se cierra un carril por obras de mantenimiento.
+            </div>
+            <div class="card-footer">
+                <div class="card-location">📍 Av. Diagonal, entre Paseo Sant Joan y Paseo de Gracia</div>
+            </div>
+        </div>
+
+        <div class="card low">
+            <div class="card-header">
+                <div class="card-icon">📢</div>
+                <div class="card-header-content">
+                    <div class="card-title">Evento especial</div>
+                    <div class="card-time">Desde 11:00 · Hasta 14:00</div>
+                </div>
+                <div class="severity-badge severity-low">Bajo</div>
+            </div>
+            <div class="card-description">
+                Marcha por el centro de la ciudad. Posibles congestiones.
+            </div>
+            <div class="card-footer">
+                <div class="card-location">📍 Centro de Barcelona</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

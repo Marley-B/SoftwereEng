@@ -14,5 +14,10 @@
     "dev:worker": "bun run --filter @route-helper/worker dev",
     "typecheck": "bun run typecheck:all",
     "typecheck:all": "bun run --filter '*' typecheck"
+  },
+  "dependencies": {
+    "expo-asset": "55.0.17",
+    "expo-notifications": "55.0.22",
+    "react-native": "0.76.9"
   }
 }
