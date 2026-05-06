@@ -7,6 +7,16 @@ import {
 } from "react-native";
 import type { Route } from "@route-helper/shared";
 
+function calculateArrivalTime(estimatedMinutes: number): string {
+  const now = new Date();
+  const arrival = new Date(now.getTime() + estimatedMinutes * 60000);
+  return arrival.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 type RouteItemProps = {
   route: Route;
   onDelete?: (routeId: string) => void;
@@ -28,7 +38,7 @@ export function RouteItem({ route, onDelete }: RouteItemProps) {
           <View style={styles.infoSection}>
             <Text style={styles.routeName}>{route.name}</Text>
             <Text style={styles.eta}>
-              ⏱️ {route.estimatedArrivalTime} min
+              ⏱️ {route.estimatedArrivalTime} min • Arrives: {calculateArrivalTime(route.estimatedArrivalTime)}
             </Text>
           </View>
           <Text style={styles.chevron}>

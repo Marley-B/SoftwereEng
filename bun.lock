@@ -27,6 +27,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@expo/metro-runtime": "~4.0.0",
+        "@route-helper/shared": "*",
         "expo": "~52.0.0",
         "expo-asset": "~9.0.0",
         "expo-router": "~4.0.0",

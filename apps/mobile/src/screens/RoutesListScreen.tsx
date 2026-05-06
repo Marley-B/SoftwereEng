@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -11,6 +12,16 @@ import {
 } from "react-native";
 import type { Route, PlaceRef } from "@route-helper/shared";
 import { RouteItem } from "../components/routes/RouteItem";
+
+function calculateArrivalTime(estimatedMinutes: number): string {
+  const now = new Date();
+  const arrival = new Date(now.getTime() + estimatedMinutes * 60000);
+  return arrival.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
 
 type RoutesListScreenProps = {
   onSignOut?: () => void;
@@ -79,15 +90,16 @@ export function RoutesListScreen({ onSignOut }: RoutesListScreenProps) {
   const [newRouteName, setNewRouteName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
-  const handleAddRoute = async () => {
+  const handleAddRoute = () => {
     if (!newRouteName.trim()) {
-      alert("Please enter a route name");
+      Alert.alert("Error", "Please enter a route name");
       return;
     }
 
     setIsAdding(true);
 
     // Simulate API call
+    const randomETA = Math.floor(Math.random() * 60) + 5;
     const newRoute: Route = {
       id: Math.random().toString(36).substring(7),
       name: newRouteName.trim(),
@@ -103,14 +115,18 @@ export function RoutesListScreen({ onSignOut }: RoutesListScreenProps) {
         lng: -73.9776,
         placeId: "mock-end",
       },
-      estimatedArrivalTime: Math.floor(Math.random() * 60) + 5,
+      estimatedArrivalTime: randomETA,
       createdAt: new Date(),
     };
 
     setTimeout(() => {
-      setRoutes([...routes, newRoute]);
+      setRoutes([newRoute, ...routes]);
       setNewRouteName("");
       setIsAdding(false);
+      Alert.alert(
+        "Route Added",
+        `${newRouteName} added! Estimated arrival: ${calculateArrivalTime(randomETA)}`
+      );
     }, 500);
   };
 
