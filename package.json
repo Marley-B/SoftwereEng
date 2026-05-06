@@ -14,5 +14,9 @@
     "dev:worker": "bun run --filter @route-helper/worker dev",
     "typecheck": "bun run typecheck:all",
     "typecheck:all": "bun run --filter '*' typecheck"
+  },
+  "dependencies": {
+    "react-dom": "19.2.5",
+    "react-native-web": "0.21.2"
   }
 }
