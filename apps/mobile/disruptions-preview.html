@@ -183,5 +183,16 @@
             </div>
         </div>
     </div>
+    <div class="notification" id="notification">Datos actualizados</div>
+
+    <script>
+        document.getElementById('refreshBtn').addEventListener('click', function() {
+            const notification = document.getElementById('notification');
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000); // Hide after 3 seconds
+        });
+    </script>
 </body>
 </html>
