@@ -7,9 +7,6 @@ const config: ExpoConfig = {
   version: "0.0.1",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
-  experiments: {
-    typedRoutes: true
-  },
   ios: {
     supportsTablet: true
   },

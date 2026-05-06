@@ -2,7 +2,7 @@
   "name": "@route-helper/mobile",
   "private": true,
   "version": "0.0.1",
-  "main": "expo-router/entry",
+  "main": "expo/AppEntry.js",
   "scripts": {
     "dev": "expo start",
     "android": "expo start --android",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@route-helper/shared": "workspace:*",
     "expo": "~52.0.0",
+    "expo-asset": "~11.0.5",
     "expo-router": "~4.0.0",
     "react": "18.3.1",
     "react-native": "0.76.9"

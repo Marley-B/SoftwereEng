@@ -49,4 +49,20 @@ export const disruptionSchema = z.object({
   startTime: z.string().datetime(),
   endTime: z.string().datetime().optional(),
   createdAt: z.string().datetime(),
+export interface Route {
+  id: string;
+  name: string;
+  startLocation: PlaceRef;
+  endLocation: PlaceRef;
+  estimatedArrivalTime: number; // in minutes
+  createdAt: Date;
+}
+
+export const routeSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  startLocation: placeRefSchema,
+  endLocation: placeRefSchema,
+  estimatedArrivalTime: z.number().positive(),
+  createdAt: z.date(),
 });
