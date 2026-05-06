@@ -1,16 +1,30 @@
-import { Alert, SafeAreaView, StyleSheet } from "react-native";
+import { useState } from "react";
+import { SafeAreaView, StyleSheet } from "react-native";
 
 import { AuthForm } from "./components/auth/AuthForm";
+import { RoutesListScreen } from "./screens/RoutesListScreen";
+
+type AppState = "auth" | "routes";
 
 export function App() {
+  const [appState, setAppState] = useState<AppState>("auth");
+
+  if (appState === "routes") {
+    return (
+      <RoutesListScreen
+        onSignOut={() => setAppState("auth")}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={styles.screen}>
       <AuthForm
         onSignIn={({ email }) => {
-          Alert.alert("Sign in", `Signing in with ${email}`);
+          setAppState("routes");
         }}
         onSignUp={({ email }) => {
-          Alert.alert("Sign up", `Creating account for ${email}`);
+          setAppState("routes");
         }}
       />
     </SafeAreaView>

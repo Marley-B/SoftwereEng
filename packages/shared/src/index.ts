@@ -17,3 +17,21 @@ export const placeRefSchema = z.object({
 export const commuteModeSchema = z.enum(["driving", "transit", "walking", "bicycling"]);
 
 export const checkStatusSchema = z.enum(["ok", "warn", "fail"]);
+
+export interface Route {
+  id: string;
+  name: string;
+  startLocation: PlaceRef;
+  endLocation: PlaceRef;
+  estimatedArrivalTime: number; // in minutes
+  createdAt: Date;
+}
+
+export const routeSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  startLocation: placeRefSchema,
+  endLocation: placeRefSchema,
+  estimatedArrivalTime: z.number().positive(),
+  createdAt: z.date(),
+});
