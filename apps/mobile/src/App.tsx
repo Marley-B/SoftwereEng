@@ -1,25 +1,35 @@
-import { Alert, SafeAreaView, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { AuthForm } from "./components/auth/AuthForm";
+import { AuthNavigator } from "./features/auth/AuthNavigator";
+import {
+  MockAuthProvider,
+  useMockAuth,
+} from "./features/auth/context/MockAuthProvider";
+import { HomeScreen } from "./screens/HomeScreen";
+
+function Root() {
+  const { user } = useMockAuth();
+
+  return (
+    <View style={styles.screen}>
+      {user ? <HomeScreen /> : <AuthNavigator />}
+    </View>
+  );
+}
 
 export function App() {
   return (
-    <SafeAreaView style={styles.screen}>
-      <AuthForm
-        onSignIn={({ email }) => {
-          Alert.alert("Sign in", `Signing in with ${email}`);
-        }}
-        onSignUp={({ email }) => {
-          Alert.alert("Sign up", `Creating account for ${email}`);
-        }}
-      />
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <MockAuthProvider>
+        <Root />
+      </MockAuthProvider>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: "#f7f8fb",
     flex: 1,
   },
 });
