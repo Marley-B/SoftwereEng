@@ -44,12 +44,14 @@ export function SignUpScreen({ onBack, onHaveAccount }: SignUpScreenProps) {
 
   return (
     <AuthScreenLayout bottomInset={authTheme.space.lg}>
-      <Text accessibilityRole="header" style={styles.title}>
-        Create account
-      </Text>
-      <Text style={styles.subtitle}>
-        Eight-character minimum password.
-      </Text>
+      <View style={{flex: 1}}>
+        <Text accessibilityRole="header" style={styles.title}>
+          Create account
+        </Text>
+        <Text style={styles.subtitle}>
+          Eight-character minimum password.
+        </Text>
+      </View>
 
       <AuthTextField
         autoCapitalize="words"
@@ -120,7 +122,6 @@ const styles = StyleSheet.create({
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.body,
     lineHeight: 24,
-    marginTop: -authTheme.space.sm,
   },
   title: {
     color: authTheme.colors.foreground,

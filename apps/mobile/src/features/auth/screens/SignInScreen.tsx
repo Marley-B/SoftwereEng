@@ -41,11 +41,12 @@ export function SignInScreen({ onBack, onNeedAccount }: SignInScreenProps) {
         {onBack && <AuthGhostButton disabled={isBusy} label="← Back" onPress={onBack} />}
       </View>
 
-      <Text accessibilityRole="header" style={styles.title}>
-        Sign in
-      </Text>
-      <Text style={styles.subtitle}>Use the email you will use with Route Helper.</Text>
-
+      <View style={{flex: 1}}>
+        <Text accessibilityRole="header" style={styles.title}>
+          Sign in
+        </Text>
+        <Text style={styles.subtitle}>Use the email you will use with Route Helper.</Text>
+      </View>
       <AuthTextField
         autoCapitalize="none"
         autoComplete="email"
@@ -101,7 +102,7 @@ const styles = StyleSheet.create({
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.body,
     lineHeight: 24,
-    marginTop: -authTheme.space.sm,
+    marginTop: authTheme.space.sm,
   },
   title: {
     color: authTheme.colors.foreground,
