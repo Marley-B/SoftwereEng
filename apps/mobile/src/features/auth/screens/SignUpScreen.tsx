@@ -3,7 +3,6 @@ import { StyleSheet, Text, View } from "react-native";
 
 import {
   AuthFooterLink,
-  AuthGhostButton,
   AuthPrimaryButton,
 } from "../components/AuthButtons";
 import { AuthScreenLayout } from "../components/AuthScreenLayout";
@@ -49,8 +48,7 @@ export function SignUpScreen({ onBack, onHaveAccount }: SignUpScreenProps) {
         Create account
       </Text>
       <Text style={styles.subtitle}>
-        Eight-character minimum password. Everything stays on-device until you
-        connect an API.
+        Eight-character minimum password.
       </Text>
 
       <AuthTextField
