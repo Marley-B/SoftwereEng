@@ -2,7 +2,7 @@
 export function formatRouteTime(date: Date): string {
   const h = date.getHours();
   const m = date.getMinutes();
-  return `${h}:${m.toString().padStart(2, "0")}`;
+  return `${h}:${m.toString().padStart(2, '0')}`;
 }
 
 /** Parses "H:mm" or "HH:mm"; falls back to a sensible default when invalid. */
@@ -16,12 +16,7 @@ export function parseRouteTime(value: string, fallback: Date): Date {
   }
   const hours = Number.parseInt(hRaw, 10);
   const minutes = Number.parseInt(mRaw, 10);
-  if (
-    Number.isNaN(hours) ||
-    Number.isNaN(minutes) ||
-    hours > 23 ||
-    minutes > 59
-  ) {
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || hours > 23 || minutes > 59) {
     return next;
   }
   next.setHours(hours, minutes, 0, 0);

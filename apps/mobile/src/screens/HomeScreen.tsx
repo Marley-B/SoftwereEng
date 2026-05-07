@@ -1,37 +1,19 @@
-import { useCallback, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  AuthGhostButton,
-  AuthPrimaryButton,
-} from "../features/auth/components/AuthButtons";
-import { useMockAuth } from "../features/auth/context/MockAuthProvider";
-import { authTheme } from "../features/auth/theme";
-import { RouteFormModal } from "../features/routes/components/RouteFormModal";
-import { RouteListItem } from "../features/routes/components/RouteListItem";
-import { makeRouteId } from "../features/routes/makeRouteId";
-import type { Route, RouteDraft } from "../features/routes/types";
-import { useRoutes } from "../features/routes/useRoutes";
+import { AuthGhostButton, AuthPrimaryButton } from '../features/auth/components/AuthButtons';
+import { useMockAuth } from '../features/auth/context/MockAuthProvider';
+import { authTheme } from '../features/auth/theme';
+import { RouteFormModal } from '../features/routes/components/RouteFormModal';
+import { RouteListItem } from '../features/routes/components/RouteListItem';
+import { makeRouteId } from '../features/routes/makeRouteId';
+import type { Route, RouteDraft } from '../features/routes/types';
+import { useRoutes } from '../features/routes/useRoutes';
 
 export function HomeScreen() {
   const { signOut, user } = useMockAuth();
-  const {
-    routes,
-    isLoading,
-    error,
-    refetch,
-    addRoute,
-    updateRoute,
-    deleteRoute,
-  } = useRoutes();
+  const { routes, isLoading, error, refetch, addRoute, updateRoute, deleteRoute } = useRoutes();
 
   const [formVisible, setFormVisible] = useState(false);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
@@ -74,14 +56,12 @@ export function HomeScreen() {
     () => (
       <View style={styles.topRow}>
         <View style={styles.titleBlock}>
-          <Text accessibilityRole="header" style={styles.title}>
+          <Text accessibilityRole='header' style={styles.title}>
             Your routes
           </Text>
-          <Text style={styles.subtitle}>
-            Tap a route to see details and actions.
-          </Text>
+          <Text style={styles.subtitle}>Tap a route to see details and actions.</Text>
         </View>
-        <AuthGhostButton label="Sign out" onPress={() => void signOut()} />
+        <AuthGhostButton label='Sign out' onPress={() => void signOut()} />
       </View>
     ),
     [signOut],
@@ -92,7 +72,7 @@ export function HomeScreen() {
   }
 
   return (
-    <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safe}>
+    <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.safe}>
       <View style={styles.column}>
         <RouteFormModal
           editingRoute={editingRoute}
@@ -106,12 +86,9 @@ export function HomeScreen() {
             <View style={styles.centered}>
               <Text style={styles.errorText}>{error}</Text>
               <Pressable
-                accessibilityRole="button"
+                accessibilityRole='button'
                 onPress={() => void refetch()}
-                style={({ pressed }) => [
-                  styles.retry,
-                  pressed ? styles.retryPressed : null,
-                ]}
+                style={({ pressed }) => [styles.retry, pressed ? styles.retryPressed : null]}
               >
                 <Text style={styles.retryLabel}>Try again</Text>
               </Pressable>
@@ -125,10 +102,7 @@ export function HomeScreen() {
                 ListEmptyComponent={
                   isLoading ? (
                     <View style={styles.listEmptyFill}>
-                      <ActivityIndicator
-                        color={authTheme.colors.primary}
-                        size="large"
-                      />
+                      <ActivityIndicator color={authTheme.colors.primary} size='large' />
                       <Text style={styles.hint}>Loading routes…</Text>
                     </View>
                   ) : (
@@ -136,19 +110,13 @@ export function HomeScreen() {
                   )
                 }
                 ListHeaderComponent={renderListHeader}
-                renderItem={({ item }) => (
-                  <RouteListItem
-                    onDelete={onDelete}
-                    onEdit={openEditRoute}
-                    route={item}
-                  />
-                )}
+                renderItem={({ item }) => <RouteListItem onDelete={onDelete} onEdit={openEditRoute} route={item} />}
                 showsVerticalScrollIndicator={false}
                 style={styles.listFlex}
               />
               {!isLoading ? (
                 <View style={styles.footer}>
-                  <AuthPrimaryButton label="Add route" onPress={openAddRoute} />
+                  <AuthPrimaryButton label='Add route' onPress={openAddRoute} />
                 </View>
               ) : null}
             </>
@@ -162,20 +130,20 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   column: {
     flex: 1,
-    width: "100%",
+    width: '100%',
   },
   centered: {
-    alignItems: "center",
+    alignItems: 'center',
     flexGrow: 1,
     gap: authTheme.space.md,
-    justifyContent: "center",
+    justifyContent: 'center',
     paddingVertical: authTheme.space.xl,
   },
   listEmptyFill: {
-    alignItems: "center",
+    alignItems: 'center',
     flexGrow: 1,
     gap: authTheme.space.md,
-    justifyContent: "center",
+    justifyContent: 'center',
     minHeight: 280,
     paddingVertical: authTheme.space.xl,
   },
@@ -187,23 +155,23 @@ const styles = StyleSheet.create({
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.body,
     paddingVertical: authTheme.space.lg,
-    textAlign: "center",
+    textAlign: 'center',
   },
   errorText: {
     color: authTheme.colors.danger,
     fontSize: authTheme.typography.body,
-    textAlign: "center",
+    textAlign: 'center',
   },
   hint: {
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.caption,
   },
   inner: {
-    alignSelf: "center",
+    alignSelf: 'center',
     flex: 1,
     maxWidth: 480,
     paddingHorizontal: authTheme.space.lg,
-    width: "100%",
+    width: '100%',
   },
   listFlex: {
     flex: 1,
@@ -214,17 +182,17 @@ const styles = StyleSheet.create({
     paddingBottom: authTheme.space.xl,
   },
   retry: {
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: authTheme.colors.primary,
     borderRadius: authTheme.radii.control,
-    justifyContent: "center",
+    justifyContent: 'center',
     minHeight: 48,
     paddingHorizontal: authTheme.space.lg,
   },
   retryLabel: {
     color: authTheme.colors.onPrimary,
     fontSize: authTheme.typography.label,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   retryPressed: {
     backgroundColor: authTheme.colors.primaryPressed,
@@ -242,17 +210,17 @@ const styles = StyleSheet.create({
   title: {
     color: authTheme.colors.foreground,
     fontSize: authTheme.typography.title,
-    fontWeight: "800",
+    fontWeight: '800',
   },
   titleBlock: {
     flex: 1,
     paddingRight: authTheme.space.sm,
   },
   topRow: {
-    alignItems: "flex-start",
-    flexDirection: "row",
+    alignItems: 'flex-start',
+    flexDirection: 'row',
     gap: authTheme.space.sm,
-    justifyContent: "space-between",
+    justifyContent: 'space-between',
     paddingTop: authTheme.space.sm,
   },
 });
