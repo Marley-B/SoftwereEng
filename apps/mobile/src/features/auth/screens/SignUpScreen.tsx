@@ -45,10 +45,6 @@ export function SignUpScreen({ onBack, onHaveAccount }: SignUpScreenProps) {
 
   return (
     <AuthScreenLayout bottomInset={authTheme.space.lg}>
-      <View style={styles.topBar}>
-        <AuthGhostButton disabled={isBusy} label="← Back" onPress={onBack} />
-      </View>
-
       <Text accessibilityRole="header" style={styles.title}>
         Create account
       </Text>
