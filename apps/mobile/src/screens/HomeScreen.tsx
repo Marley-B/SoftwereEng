@@ -75,12 +75,12 @@ export function HomeScreen() {
           onPress={() => setShowDisruptions(true)}
           style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
         >
-          <MessageSquareWarning color={authTheme.colors.primary} size={24} strokeWidth={2} />
           {disruptionCount > 0 ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{disruptionCount > 99 ? '99+' : disruptionCount}</Text>
             </View>
           ) : null}
+          <MessageSquareWarning color={authTheme.colors.primary} size={24} strokeWidth={2} />
         </Pressable>
       </View>
     ),
@@ -261,12 +261,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: authTheme.colors.danger,
     borderRadius: 10,
-    bottom: 2,
+    top: 0,
     justifyContent: 'center',
     minWidth: 18,
     paddingHorizontal: 4,
     position: 'absolute',
     right: 0,
+    zIndex: 20,
   },
   badgeText: {
     color: authTheme.colors.onPrimary,
