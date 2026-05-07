@@ -7,3 +7,12 @@ export interface Route {
   departure: string;
   destination: string;
 }
+
+/** Payload for create/update before an id is assigned (add flow). */
+export interface RouteDraft {
+  departure: string;
+  destination: string;
+  expectedArrival: string;
+  name: string;
+  startTime: string;
+}
