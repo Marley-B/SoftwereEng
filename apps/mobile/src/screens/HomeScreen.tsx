@@ -1,7 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -10,31 +9,66 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AuthGhostButton } from "../features/auth/components/AuthButtons";
+import {
+  AuthGhostButton,
+  AuthPrimaryButton,
+} from "../features/auth/components/AuthButtons";
 import { useMockAuth } from "../features/auth/context/MockAuthProvider";
 import { authTheme } from "../features/auth/theme";
+import { RouteFormModal } from "../features/routes/components/RouteFormModal";
 import { RouteListItem } from "../features/routes/components/RouteListItem";
+import { makeRouteId } from "../features/routes/makeRouteId";
+import type { Route, RouteDraft } from "../features/routes/types";
 import { useRoutes } from "../features/routes/useRoutes";
-import type { Route } from "../features/routes/types";
 
 export function HomeScreen() {
   const { signOut, user } = useMockAuth();
-  const { routes, isLoading, error, refetch } = useRoutes();
+  const {
+    routes,
+    isLoading,
+    error,
+    refetch,
+    addRoute,
+    updateRoute,
+    deleteRoute,
+  } = useRoutes();
 
-  const onEdit = useCallback((route: Route) => {
-    Alert.alert("Edit route", `Edit “${route.name}” when the editor is ready.`);
+  const [formVisible, setFormVisible] = useState(false);
+  const [editingRoute, setEditingRoute] = useState<Route | null>(null);
+
+  const openAddRoute = useCallback(() => {
+    setEditingRoute(null);
+    setFormVisible(true);
   }, []);
 
-  const onDelete = useCallback((route: Route) => {
-    Alert.alert(
-      "Delete route",
-      `Remove “${route.name}”? This will call the API once it exists.`,
-      [
-        { style: "cancel", text: "Cancel" },
-        { style: "destructive", text: "Delete" },
-      ],
-    );
+  const openEditRoute = useCallback((route: Route) => {
+    setEditingRoute(route);
+    setFormVisible(true);
   }, []);
+
+  const closeForm = useCallback(() => {
+    setFormVisible(false);
+    setEditingRoute(null);
+  }, []);
+
+  const onSaveRoute = useCallback(
+    (draft: RouteDraft, editingId: string | null) => {
+      if (editingId) {
+        updateRoute(editingId, draft);
+      } else {
+        addRoute({ ...draft, id: makeRouteId() });
+      }
+      closeForm();
+    },
+    [addRoute, closeForm, updateRoute],
+  );
+
+  const onDelete = useCallback(
+    (route: Route) => {
+      deleteRoute(route.id);
+    },
+    [deleteRoute],
+  );
 
   const renderListHeader = useCallback(
     () => (
@@ -58,57 +92,78 @@ export function HomeScreen() {
   }
 
   return (
-    <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}>
-      <View style={styles.inner}>
-        {error ? (
-          <View style={styles.centered}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void refetch()}
-              style={({ pressed }) => [
-                styles.retry,
-                pressed ? styles.retryPressed : null,
-              ]}
-            >
-              <Text style={styles.retryLabel}>Try again</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <FlatList
-            contentContainerStyle={styles.listContent}
-            data={isLoading ? [] : routes}
-            keyExtractor={(item) => item.id}
-            ListEmptyComponent={
-              isLoading ? (
-                <View style={styles.listEmptyFill}>
-                  <ActivityIndicator
-                    color={authTheme.colors.primary}
-                    size="large"
+    <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safe}>
+      <View style={styles.column}>
+        <RouteFormModal
+          editingRoute={editingRoute}
+          onDismiss={closeForm}
+          onSubmit={onSaveRoute}
+          visible={formVisible}
+        />
+
+        <View style={styles.inner}>
+          {error ? (
+            <View style={styles.centered}>
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void refetch()}
+                style={({ pressed }) => [
+                  styles.retry,
+                  pressed ? styles.retryPressed : null,
+                ]}
+              >
+                <Text style={styles.retryLabel}>Try again</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <FlatList
+                contentContainerStyle={styles.listContent}
+                data={isLoading ? [] : routes}
+                keyExtractor={(item) => item.id}
+                ListEmptyComponent={
+                  isLoading ? (
+                    <View style={styles.listEmptyFill}>
+                      <ActivityIndicator
+                        color={authTheme.colors.primary}
+                        size="large"
+                      />
+                      <Text style={styles.hint}>Loading routes…</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.empty}>No routes yet.</Text>
+                  )
+                }
+                ListHeaderComponent={renderListHeader}
+                renderItem={({ item }) => (
+                  <RouteListItem
+                    onDelete={onDelete}
+                    onEdit={openEditRoute}
+                    route={item}
                   />
-                  <Text style={styles.hint}>Loading routes…</Text>
-                </View>
-              ) : (
-                <Text style={styles.empty}>No routes yet.</Text>
-              )
-            }
-            ListHeaderComponent={renderListHeader}
-            renderItem={({ item }) => (
-              <RouteListItem
-                onDelete={onDelete}
-                onEdit={onEdit}
-                route={item}
+                )}
+                showsVerticalScrollIndicator={false}
+                style={styles.listFlex}
               />
-            )}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
+              {!isLoading ? (
+                <View style={styles.footer}>
+                  <AuthPrimaryButton label="Add route" onPress={openAddRoute} />
+                </View>
+              ) : null}
+            </>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  column: {
+    flex: 1,
+    width: "100%",
+  },
   centered: {
     alignItems: "center",
     flexGrow: 1,
@@ -123,6 +178,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 280,
     paddingVertical: authTheme.space.xl,
+  },
+  footer: {
+    paddingBottom: authTheme.space.sm,
+    paddingTop: authTheme.space.md,
   },
   empty: {
     color: authTheme.colors.muted,
@@ -145,6 +204,9 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     paddingHorizontal: authTheme.space.lg,
     width: "100%",
+  },
+  listFlex: {
+    flex: 1,
   },
   listContent: {
     flexGrow: 1,

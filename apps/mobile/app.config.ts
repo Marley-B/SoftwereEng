@@ -1,5 +1,8 @@
 import { ExpoConfig } from "expo/config";
 
+const googleMapsAndroidKey =
+  process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY ?? "";
+
 const config: ExpoConfig = {
   name: "Route Helper",
   slug: "route-helper",
@@ -7,16 +10,23 @@ const config: ExpoConfig = {
   version: "0.0.1",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
-  experiments: {
-    typedRoutes: true
-  },
+  plugins: ["@react-native-community/datetimepicker"],
   ios: {
     supportsTablet: true
   },
   android: {
     adaptiveIcon: {
       backgroundColor: "#FFFFFF"
-    }
+    },
+    ...(googleMapsAndroidKey
+      ? {
+          config: {
+            googleMaps: {
+              apiKey: googleMapsAndroidKey,
+            },
+          },
+        }
+      : {}),
   },
   extra: {
     apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:3000"

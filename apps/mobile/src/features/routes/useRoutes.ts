@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { fetchRoutes } from "./mockRoutes";
-import type { Route } from "./types";
+import type { Route, RouteDraft } from "./types";
 
 interface UseRoutesResult {
+  addRoute: (route: Route) => void;
+  deleteRoute: (id: string) => void;
   error: string | null;
   isLoading: boolean;
   refetch: () => Promise<void>;
   routes: Route[];
+  updateRoute: (id: string, draft: RouteDraft) => void;
 }
 
 /** Mirrors future remote loading: swap `fetchRoutes` implementation only. */
@@ -33,5 +36,34 @@ export function useRoutes(): UseRoutesResult {
     void load();
   }, [load]);
 
-  return { routes, isLoading, error, refetch: load };
+  const addRoute = useCallback((route: Route) => {
+    setRoutes((prev) => [...prev, route]);
+  }, []);
+
+  const updateRoute = useCallback((id: string, draft: RouteDraft) => {
+    setRoutes((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              ...draft,
+            }
+          : r,
+      ),
+    );
+  }, []);
+
+  const deleteRoute = useCallback((id: string) => {
+    setRoutes((prev) => prev.filter((r) => r.id !== id));
+  }, []);
+
+  return {
+    routes,
+    isLoading,
+    error,
+    refetch: load,
+    addRoute,
+    updateRoute,
+    deleteRoute,
+  };
 }
