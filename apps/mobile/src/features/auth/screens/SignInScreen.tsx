@@ -13,7 +13,7 @@ import { authTheme } from "../theme";
 import { validateEmail, validatePassword } from "../validation";
 
 interface SignInScreenProps {
-  onBack: () => void;
+  onBack?: () => void;
   onNeedAccount: () => void;
 }
 
@@ -38,7 +38,7 @@ export function SignInScreen({ onBack, onNeedAccount }: SignInScreenProps) {
   return (
     <AuthScreenLayout bottomInset={authTheme.space.lg}>
       <View style={styles.topBar}>
-        <AuthGhostButton disabled={isBusy} label="← Back" onPress={onBack} />
+        {onBack && <AuthGhostButton disabled={isBusy} label="← Back" onPress={onBack} />}
       </View>
 
       <Text accessibilityRole="header" style={styles.title}>

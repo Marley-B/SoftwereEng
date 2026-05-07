@@ -1,22 +1,29 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MessageSquareWarning } from 'lucide-react-native';
 
-import { AuthGhostButton, AuthPrimaryButton } from '../features/auth/components/AuthButtons';
+import { AuthPrimaryButton } from '../features/auth/components/AuthButtons';
 import { useMockAuth } from '../features/auth/context/MockAuthProvider';
 import { authTheme } from '../features/auth/theme';
+import { useDisruptionsContext } from '../features/disruptions/context/DisruptionsProvider';
 import { RouteFormModal } from '../features/routes/components/RouteFormModal';
 import { RouteListItem } from '../features/routes/components/RouteListItem';
 import { makeRouteId } from '../features/routes/makeRouteId';
 import type { Route, RouteDraft } from '../features/routes/types';
 import { useRoutes } from '../features/routes/useRoutes';
+import { RouteDisruptionsScreen } from './RouteDisruptionsScreen';
 
 export function HomeScreen() {
-  const { signOut, user } = useMockAuth();
+  const { signOut: _signOut, user } = useMockAuth();
   const { routes, isLoading, error, refetch, addRoute, updateRoute, deleteRoute } = useRoutes();
+  const { disruptions } = useDisruptionsContext();
 
   const [formVisible, setFormVisible] = useState(false);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
+  const [showDisruptions, setShowDisruptions] = useState(false);
+
+  const disruptionCount = disruptions.length;
 
   const openAddRoute = useCallback(() => {
     setEditingRoute(null);
@@ -61,14 +68,31 @@ export function HomeScreen() {
           </Text>
           <Text style={styles.subtitle}>Tap a route to see details and actions.</Text>
         </View>
-        <AuthGhostButton label='Sign out' onPress={() => void signOut()} />
+        <Pressable
+          accessibilityLabel={`Route disruptions, ${disruptionCount} active`}
+          accessibilityRole='button'
+          hitSlop={12}
+          onPress={() => setShowDisruptions(true)}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+        >
+          <MessageSquareWarning color={authTheme.colors.primary} size={24} strokeWidth={2} />
+          {disruptionCount > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{disruptionCount > 99 ? '99+' : disruptionCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
     ),
-    [signOut],
+    [disruptionCount],
   );
 
   if (!user) {
     return null;
+  }
+
+  if (showDisruptions) {
+    return <RouteDisruptionsScreen onBack={() => setShowDisruptions(false)} />;
   }
 
   return (
@@ -222,5 +246,32 @@ const styles = StyleSheet.create({
     gap: authTheme.space.sm,
     justifyContent: 'space-between',
     paddingTop: authTheme.space.sm,
+  },
+  iconBtn: {
+    alignItems: 'center',
+    borderRadius: authTheme.radii.control,
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 44,
+  },
+  iconBtnPressed: {
+    opacity: 0.6,
+  },
+  badge: {
+    alignItems: 'center',
+    backgroundColor: authTheme.colors.danger,
+    borderRadius: 10,
+    bottom: 2,
+    justifyContent: 'center',
+    minWidth: 18,
+    paddingHorizontal: 4,
+    position: 'absolute',
+    right: 0,
+  },
+  badgeText: {
+    color: authTheme.colors.onPrimary,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 18,
   },
 });

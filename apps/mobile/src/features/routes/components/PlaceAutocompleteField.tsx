@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -14,6 +14,7 @@ import { authTheme } from "../../auth/theme";
 import {
   type PhotonFeature,
   type PhotonLang,
+  coordsFromPhotonFeature,
   fetchPhotonSuggestions,
   labelFromPhotonFeature,
 } from "../photonPlaces";
@@ -21,7 +22,7 @@ import {
 interface PlaceAutocompleteFieldProps {
   label: string;
   photonLang: PhotonLang;
-  onChangeText: (text: string) => void;
+  onSelect: (label: string, coords: { latitude: number; longitude: number } | null) => void;
   placeholder?: string;
   value: string;
 }
@@ -29,46 +30,84 @@ interface PlaceAutocompleteFieldProps {
 export function PlaceAutocompleteField({
   label,
   photonLang,
-  onChangeText,
+  onSelect,
   placeholder,
   value,
 }: PlaceAutocompleteFieldProps) {
-  const [focused, setFocused] = useState(false);
+  const [query, setQuery] = useState(value);
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<PhotonFeature[]>([]);
 
+  // Set to true on suggestion touchstart so onBlur knows not to close the list.
+  const suppressBlurRef = useRef(false);
+
+  // Track current query in a ref so the value-sync effect can compare without
+  // listing `query` as a dependency (which would cause it to run on every keystroke).
+  const queryRef = useRef(query);
+  queryRef.current = query;
+
+  // Sync external resets (e.g. form clear) into local state.
+  // Only fires when `value` differs from what the user has typed — not on
+  // every echo-back from the parent after a keystroke.
   useEffect(() => {
-    const q = value.trim();
+    if (value !== queryRef.current) {
+      setQuery(value);
+      setSuggestions([]);
+      setOpen(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  // Debounced Photon search.
+  useEffect(() => {
+    const q = query.trim();
     if (q.length < 2) {
       setSuggestions([]);
       setLoading(false);
       return;
     }
-
     const ac = new AbortController();
     const timer = setTimeout(() => {
       setLoading(true);
       void fetchPhotonSuggestions(q, { lang: photonLang, signal: ac.signal })
-        .then((features) => {
-          setSuggestions(features);
-        })
-        .catch(() => {
-          setSuggestions([]);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+        .then((features) => setSuggestions(features))
+        .catch(() => setSuggestions([]))
+        .finally(() => setLoading(false));
     }, 380);
-
     return () => {
       clearTimeout(timer);
       ac.abort();
     };
-  }, [value, photonLang]);
+  }, [query, photonLang]);
 
-  const showList = focused && value.trim().length >= 2;
+  const handleChangeText = (text: string) => {
+    setQuery(text);
+    setOpen(true);
+    onSelect(text, null);
+  };
 
-  /* Elevate while dropdown is open so lower fields don’t cover suggestions. */
+  const handleBlur = () => {
+    // If the user is in the middle of pressing a suggestion, don't close yet —
+    // handleSelectSuggestion will close it after committing the selection.
+    if (suppressBlurRef.current) {
+      return;
+    }
+    setOpen(false);
+  };
+
+  const handleSelectSuggestion = (feature: PhotonFeature) => {
+    suppressBlurRef.current = false;
+    const line = labelFromPhotonFeature(feature);
+    const coords = coordsFromPhotonFeature(feature);
+    setQuery(line);
+    setSuggestions([]);
+    setOpen(false);
+    onSelect(line, coords);
+  };
+
+  const showList = open && query.trim().length >= 2 && suggestions.length > 0;
+
   return (
     <View style={[styles.wrap, showList ? styles.wrapElevated : null]}>
       <Text style={styles.label}>{label}</Text>
@@ -77,16 +116,17 @@ export function PlaceAutocompleteField({
           accessibilityHint="Worldwide address search powered by OpenStreetMap"
           autoCapitalize="words"
           autoCorrect={false}
-          onBlur={() => setFocused(false)}
-          onChangeText={onChangeText}
-          onFocus={() => setFocused(true)}
+          onBlur={handleBlur}
+          onChangeText={handleChangeText}
+          onFocus={() => {
+            if (query.trim().length >= 2 && suggestions.length > 0) {
+              setOpen(true);
+            }
+          }}
           placeholder={placeholder}
           placeholderTextColor={authTheme.colors.placeholder}
-          style={[
-            styles.input,
-            focused ? styles.inputFocused : null,
-          ]}
-          value={value}
+          style={[styles.input, open ? styles.inputFocused : null]}
+          value={query}
         />
         {loading ? (
           <View style={styles.spinner}>
@@ -98,13 +138,10 @@ export function PlaceAutocompleteField({
       {showList ? (
         <View style={styles.suggestionsWrap}>
           <ScrollView
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
             nestedScrollEnabled
             style={styles.suggestionsScroll}
           >
-            {suggestions.length === 0 && !loading ? (
-              <Text style={styles.emptyHint}>No matches — keep typing or refine.</Text>
-            ) : null}
             {suggestions.map((feature, index) => {
               const line = labelFromPhotonFeature(feature);
               const key = `${line}-${index}`;
@@ -112,9 +149,15 @@ export function PlaceAutocompleteField({
                 <Pressable
                   key={key}
                   accessibilityRole="button"
-                  onPress={() => {
-                    onChangeText(line);
-                    setFocused(false);
+                  // onPressIn fires before the TextInput's onBlur, so we can
+                  // set the flag in time to suppress the blur-close.
+                  onPressIn={() => {
+                    suppressBlurRef.current = true;
+                  }}
+                  onPress={() => handleSelectSuggestion(feature)}
+                  // If the press is cancelled (e.g. user scrolls), reset the flag.
+                  onPressOut={() => {
+                    suppressBlurRef.current = false;
                   }}
                   style={({ pressed }) => [
                     styles.suggestionRow,
@@ -133,12 +176,6 @@ export function PlaceAutocompleteField({
 }
 
 const styles = StyleSheet.create({
-  emptyHint: {
-    color: authTheme.colors.muted,
-    fontSize: authTheme.typography.caption,
-    paddingHorizontal: authTheme.space.md,
-    paddingVertical: authTheme.space.sm,
-  },
   input: {
     backgroundColor: authTheme.colors.surface,
     borderColor: authTheme.colors.border,

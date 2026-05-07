@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Dimensions,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -12,25 +13,20 @@ import {
   Text,
   View,
 } from "react-native";
-
 import {
   AuthGhostButton,
   AuthPrimaryButton,
 } from "../../auth/components/AuthButtons";
 import { AuthTextField } from "../../auth/components/AuthTextField";
 import { authTheme } from "../../auth/theme";
-import {
-  geocodeFirstCoordinate,
-  resolvePhotonLangFromEnvironment,
-} from "../photonPlaces";
+import { resolvePhotonLangFromEnvironment } from "../photonPlaces";
 import type { Route, RouteDraft } from "../types";
 import { PlaceAutocompleteField } from "./PlaceAutocompleteField";
 import { RouteEndpointsMap } from "./RouteEndpointsMap";
 import { formatRouteTime, parseRouteTime } from "../routeTimeUtils";
 
 const WINDOW_HEIGHT = Dimensions.get("window").height;
-/** Nearly full-screen sheet so form + map stay usable without excessive clipping. */
-const SHEET_HEIGHT = Math.round(WINDOW_HEIGHT * 0.94);
+const SHEET_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.94);
 
 interface RouteFormModalProps {
   editingRoute: Route | null;
@@ -47,31 +43,143 @@ function defaultMorning(): Date {
   return d;
 }
 
-interface NativeTimeFieldProps {
-  active: boolean;
+// ─── Time picker popup modal ──────────────────────────────────────────────────
+
+interface TimePickerModalProps {
   label: string;
-  onChange: (next: Date) => void;
-  onClose: () => void;
-  onOpen: () => void;
+  onConfirm: (date: Date) => void;
+  onDismiss: () => void;
+  value: Date;
+  visible: boolean;
+}
+
+function TimePickerModal({
+  label,
+  onConfirm,
+  onDismiss,
+  value,
+  visible,
+}: TimePickerModalProps) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    if (visible) {
+      setDraft(value);
+    }
+  }, [visible, value]);
+
+  if (!visible) return null;
+
+  return (
+    <View style={pickerStyles.overlay}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onDismiss}
+        style={pickerStyles.backdrop}
+      />
+      <View style={pickerStyles.centeredOuter} pointerEvents="box-none">
+        <View style={pickerStyles.card}>
+          <Text style={pickerStyles.cardTitle}>{label}</Text>
+
+          <View style={pickerStyles.wheelWrapper}>
+            <DateTimePicker
+              display="spinner"
+              mode="time"
+              textColor="#000000"
+              themeVariant="light"
+              value={draft}
+              onChange={(_, date) => {
+                if (date) setDraft(date);
+              }}
+              style={pickerStyles.wheel}
+            />
+          </View>
+
+          <View style={pickerStyles.actions}>
+            <View style={pickerStyles.actionBtn}>
+              <AuthGhostButton label="Cancel" onPress={onDismiss} />
+            </View>
+            <View style={pickerStyles.actionBtn}>
+              <AuthPrimaryButton
+                label="Confirm"
+                onPress={() => onConfirm(draft)}
+              />
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const pickerStyles = StyleSheet.create({
+  actionBtn: {
+    flex: 1,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: authTheme.space.sm,
+    marginTop: authTheme.space.md,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+  },
+  card: {
+    backgroundColor: authTheme.colors.surface,
+    borderColor: authTheme.colors.border,
+    borderRadius: authTheme.radii.screen,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    padding: authTheme.space.lg,
+    width: "100%",
+  },
+  cardTitle: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.title,
+    fontWeight: "800",
+    marginBottom: authTheme.space.sm,
+    textAlign: "center",
+  },
+  centeredOuter: {
+    alignItems: "center",
+    alignSelf: "center",
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    maxWidth: 400,
+    paddingHorizontal: authTheme.space.md,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: "100%",
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+  },
+  wheelWrapper: {
+    backgroundColor: "#ffffff",
+    borderRadius: authTheme.radii.control,
+    overflow: "hidden",
+    width: "100%",
+  },
+});
+
+// ─── Time field row (tappable display) ───────────────────────────────────────
+
+interface TimeFieldProps {
+  label: string;
+  onPress: () => void;
   value: Date;
 }
 
-function NativeTimeField({
-  active,
-  label,
-  onChange,
-  onClose,
-  onOpen,
-  value,
-}: NativeTimeFieldProps) {
-  const isAndroid = Platform.OS === "android";
-
+function TimeField({ label, onPress, value }: TimeFieldProps) {
   return (
     <View style={styles.timeBlock}>
       <Text style={styles.inputLabel}>{label}</Text>
       <Pressable
         accessibilityRole="button"
-        onPress={onOpen}
+        onPress={onPress}
         style={({ pressed }) => [
           styles.timeTouchable,
           pressed ? styles.timeTouchablePressed : null,
@@ -80,38 +188,11 @@ function NativeTimeField({
         <Text style={styles.timeTouchableText}>{formatRouteTime(value)}</Text>
         <Text style={styles.timeHint}>Tap to change</Text>
       </Pressable>
-      {active ? (
-        <View style={styles.pickerBlock}>
-          <DateTimePicker
-            display={isAndroid ? "default" : "spinner"}
-            mode="time"
-            value={value}
-            onChange={(_, date) => {
-              if (isAndroid) {
-                onClose();
-              }
-              if (date) {
-                onChange(date);
-              }
-            }}
-          />
-          {!isAndroid ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onClose}
-              style={({ pressed }) => [
-                styles.doneChip,
-                pressed ? styles.doneChipPressed : null,
-              ]}
-            >
-              <Text style={styles.doneChipLabel}>Done</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
     </View>
   );
 }
+
+// ─── Main form modal ──────────────────────────────────────────────────────────
 
 export function RouteFormModal({
   editingRoute,
@@ -119,7 +200,6 @@ export function RouteFormModal({
   onSubmit,
   visible,
 }: RouteFormModalProps) {
-  /** Stable per mount — tied to ICU/browser locale (Spanish → Photon `default`). */
   const [photonLang] = useState(resolvePhotonLangFromEnvironment);
 
   const [name, setName] = useState("");
@@ -145,9 +225,7 @@ export function RouteFormModal({
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
 
   useEffect(() => {
-    if (!visible) {
-      return;
-    }
+    if (!visible) return;
 
     const morning = defaultMorning();
     const ten = defaultMorning();
@@ -177,43 +255,6 @@ export function RouteFormModal({
     setActivePicker(null);
   }, [visible, editingRoute]);
 
-  // Live map pins while typing — Photon resolves worldwide addresses (debounced).
-  useEffect(() => {
-    const q = departure.trim();
-    if (q.length < 3) {
-      setDepCoords(null);
-      return;
-    }
-    const ac = new AbortController();
-    const handle = setTimeout(() => {
-      void geocodeFirstCoordinate(q, { lang: photonLang, signal: ac.signal }).then(
-        setDepCoords,
-      );
-    }, 520);
-    return () => {
-      clearTimeout(handle);
-      ac.abort();
-    };
-  }, [departure, photonLang]);
-
-  useEffect(() => {
-    const q = destination.trim();
-    if (q.length < 3) {
-      setDestCoords(null);
-      return;
-    }
-    const ac = new AbortController();
-    const handle = setTimeout(() => {
-      void geocodeFirstCoordinate(q, { lang: photonLang, signal: ac.signal }).then(
-        setDestCoords,
-      );
-    }, 520);
-    return () => {
-      clearTimeout(handle);
-      ac.abort();
-    };
-  }, [destination, photonLang]);
-
   const handleSubmit = () => {
     const trimmedName = name.trim();
     const trimmedDep = departure.trim();
@@ -237,23 +278,16 @@ export function RouteFormModal({
         return;
       }
       startTime = formatRouteTime(parseRouteTime(webStart, defaultMorning()));
-      expectedArrival = formatRouteTime(
-        parseRouteTime(webArrival, defaultMorning()),
-      );
+      expectedArrival = formatRouteTime(parseRouteTime(webArrival, defaultMorning()));
     } else {
       startTime = formatRouteTime(startDate);
       expectedArrival = formatRouteTime(arrivalDate);
     }
 
-    const draft: RouteDraft = {
-      departure: trimmedDep,
-      destination: trimmedDest,
-      expectedArrival,
-      name: trimmedName,
-      startTime,
-    };
-
-    onSubmit(draft, editingRoute?.id ?? null);
+    onSubmit(
+      { departure: trimmedDep, destination: trimmedDest, expectedArrival, name: trimmedName, startTime },
+      editingRoute?.id ?? null,
+    );
   };
 
   const title = editingRoute ? "Edit route" : "Add route";
@@ -266,20 +300,23 @@ export function RouteFormModal({
       visible={visible}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardRoot}
       >
         <Pressable accessibilityRole="button" onPress={onDismiss} style={styles.backdrop} />
         <View style={styles.sheetOuter} pointerEvents="box-none">
-          <View style={[styles.sheet, { height: SHEET_HEIGHT }]}>
-            <Text accessibilityRole="header" style={styles.sheetTitle}>
-              {title}
-            </Text>
+          <View style={styles.sheet}>
+            <Pressable onPress={Keyboard.dismiss} style={styles.sheetTitleArea}>
+              <Text accessibilityRole="header" style={styles.sheetTitle}>
+                {title}
+              </Text>
+            </Pressable>
 
             <ScrollView
               contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
+              keyboardShouldPersistTaps="always"
               nestedScrollEnabled
+              onScrollBeginDrag={Keyboard.dismiss}
               showsVerticalScrollIndicator
               style={styles.scrollFlex}
             >
@@ -294,14 +331,20 @@ export function RouteFormModal({
               <PlaceAutocompleteField
                 label="Departure"
                 photonLang={photonLang}
-                onChangeText={setDeparture}
+                onSelect={(label, coords) => {
+                  setDeparture(label);
+                  if (coords) setDepCoords(coords);
+                }}
                 placeholder="Search any address worldwide"
                 value={departure}
               />
               <PlaceAutocompleteField
                 label="Destination"
                 photonLang={photonLang}
-                onChangeText={setDestination}
+                onSelect={(label, coords) => {
+                  setDestination(label);
+                  if (coords) setDestCoords(coords);
+                }}
                 placeholder="Search any address worldwide"
                 value={destination}
               />
@@ -327,20 +370,14 @@ export function RouteFormModal({
                 </>
               ) : (
                 <>
-                  <NativeTimeField
-                    active={activePicker === "start"}
+                  <TimeField
                     label="Start time"
-                    onChange={setStartDate}
-                    onClose={() => setActivePicker(null)}
-                    onOpen={() => setActivePicker("start")}
+                    onPress={() => setActivePicker("start")}
                     value={startDate}
                   />
-                  <NativeTimeField
-                    active={activePicker === "arrival"}
+                  <TimeField
                     label="Expected arrival"
-                    onChange={setArrivalDate}
-                    onClose={() => setActivePicker(null)}
-                    onOpen={() => setActivePicker("arrival")}
+                    onPress={() => setActivePicker("arrival")}
                     value={arrivalDate}
                   />
                 </>
@@ -361,6 +398,28 @@ export function RouteFormModal({
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Time picker popups — inside this Modal so they render on top of it */}
+      <TimePickerModal
+        label="Start time"
+        onConfirm={(date) => {
+          setStartDate(date);
+          setActivePicker(null);
+        }}
+        onDismiss={() => setActivePicker(null)}
+        value={startDate}
+        visible={activePicker === "start"}
+      />
+      <TimePickerModal
+        label="Expected arrival"
+        onConfirm={(date) => {
+          setArrivalDate(date);
+          setActivePicker(null);
+        }}
+        onDismiss={() => setActivePicker(null)}
+        value={arrivalDate}
+        visible={activePicker === "arrival"}
+      />
     </Modal>
   );
 }
@@ -379,22 +438,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(15, 23, 42, 0.45)",
   },
-  doneChip: {
-    alignSelf: "flex-start",
-    backgroundColor: authTheme.colors.primary,
-    borderRadius: authTheme.radii.control,
-    marginTop: authTheme.space.sm,
-    paddingHorizontal: authTheme.space.md,
-    paddingVertical: authTheme.space.sm,
-  },
-  doneChipLabel: {
-    color: authTheme.colors.onPrimary,
-    fontSize: authTheme.typography.label,
-    fontWeight: "700",
-  },
-  doneChipPressed: {
-    backgroundColor: authTheme.colors.primaryPressed,
-  },
   inputLabel: {
     color: authTheme.colors.foreground,
     fontSize: authTheme.typography.label,
@@ -404,9 +447,6 @@ const styles = StyleSheet.create({
   keyboardRoot: {
     flex: 1,
     justifyContent: "center",
-  },
-  pickerBlock: {
-    marginTop: authTheme.space.sm,
   },
   scrollContent: {
     flexGrow: 1,
@@ -421,6 +461,8 @@ const styles = StyleSheet.create({
     borderColor: authTheme.colors.border,
     borderRadius: authTheme.radii.screen,
     borderWidth: StyleSheet.hairlineWidth * 2,
+    flex: 1,
+    maxHeight: SHEET_MAX_HEIGHT,
     overflow: "hidden",
     padding: authTheme.space.lg,
     paddingBottom: authTheme.space.md,
@@ -439,6 +481,9 @@ const styles = StyleSheet.create({
     fontSize: authTheme.typography.title,
     fontWeight: "800",
     marginBottom: authTheme.space.sm,
+  },
+  sheetTitleArea: {
+    width: "100%",
   },
   timeBlock: {
     width: "100%",

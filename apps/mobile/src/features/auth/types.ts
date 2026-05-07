@@ -3,4 +3,4 @@ export interface AuthUser {
   displayName: string;
 }
 
-export type AuthStep = "welcome" | "signIn" | "signUp";
+export type AuthStep = "signIn" | "signUp";

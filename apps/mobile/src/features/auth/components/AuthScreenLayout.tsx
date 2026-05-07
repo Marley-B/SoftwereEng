@@ -60,7 +60,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     alignItems: "center",
     flexGrow: 1,
-    justifyContent: "center",
     paddingTop: authTheme.space.md,
   },
 });

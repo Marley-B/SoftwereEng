@@ -6,6 +6,7 @@ import {
   MockAuthProvider,
   useMockAuth,
 } from "./features/auth/context/MockAuthProvider";
+import { DisruptionsProvider } from "./features/disruptions/context/DisruptionsProvider";
 import { HomeScreen } from "./screens/HomeScreen";
 
 function Root() {
@@ -22,7 +23,9 @@ export function App() {
   return (
     <SafeAreaProvider>
       <MockAuthProvider>
-        <Root />
+        <DisruptionsProvider>
+          <Root />
+        </DisruptionsProvider>
       </MockAuthProvider>
     </SafeAreaProvider>
   );
