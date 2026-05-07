@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LogOut, MessageSquareWarning } from 'lucide-react-native';
+import { LogOut, MessageSquareWarning, Bell } from 'lucide-react-native';
 
 import { AuthPrimaryButton } from '../features/auth/components/AuthButtons';
 import { useMockAuth } from '../features/auth/context/MockAuthProvider';
@@ -12,6 +12,7 @@ import { RouteListItem } from '../features/routes/components/RouteListItem';
 import { makeRouteId } from '../features/routes/makeRouteId';
 import type { Route, RouteDraft } from '../features/routes/types';
 import { useRoutes } from '../features/routes/useRoutes';
+import { useNotifications } from '../features/notifications/useNotifications';
 import { RouteDisruptionsScreen } from './RouteDisruptionsScreen';
 
 export function HomeScreen() {
@@ -38,6 +39,12 @@ export function HomeScreen() {
   const [showDisruptions, setShowDisruptions] = useState(false);
 
   const disruptionCount = disruptions.length;
+
+  const { sendTestDisruptionNotification } = useNotifications({
+    onDisruptionNotificationTap: () => {
+      setShowDisruptions(true);
+    },
+  });
 
   const openAddRoute = useCallback(() => {
     setEditingRoute(null);
@@ -166,6 +173,15 @@ export function HomeScreen() {
               {!isLoading ? (
                 <View style={styles.footer}>
                   <AuthPrimaryButton label='Add route' onPress={openAddRoute} />
+                  <Pressable
+                    accessibilityLabel='Test disruption notification'
+                    accessibilityRole='button'
+                    onPress={() => void sendTestDisruptionNotification()}
+                    style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
+                  >
+                    <Bell color={authTheme.colors.danger} size={18} strokeWidth={2} />
+                    <Text style={styles.testBtnLabel}>Test Disruption</Text>
+                  </Pressable>
                 </View>
               ) : null}
             </>
@@ -199,6 +215,7 @@ const styles = StyleSheet.create({
   footer: {
     paddingBottom: authTheme.space.sm,
     paddingTop: authTheme.space.md,
+    gap: authTheme.space.sm,
   },
   empty: {
     color: authTheme.colors.muted,
@@ -298,5 +315,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 18,
+  },
+  testBtn: {
+    alignItems: 'center',
+    backgroundColor: authTheme.colors.background,
+    borderColor: authTheme.colors.danger,
+    borderRadius: authTheme.radii.control,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: authTheme.space.sm,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: authTheme.space.lg,
+  },
+  testBtnPressed: {
+    opacity: 0.7,
+  },
+  testBtnLabel: {
+    color: authTheme.colors.danger,
+    fontSize: authTheme.typography.label,
+    fontWeight: '700',
   },
 });
