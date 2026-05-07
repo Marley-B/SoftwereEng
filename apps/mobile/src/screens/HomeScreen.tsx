@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MessageSquareWarning } from 'lucide-react-native';
+import { LogOut, MessageSquareWarning } from 'lucide-react-native';
 
 import { AuthPrimaryButton } from '../features/auth/components/AuthButtons';
 import { useMockAuth } from '../features/auth/context/MockAuthProvider';
@@ -16,6 +16,20 @@ import { RouteDisruptionsScreen } from './RouteDisruptionsScreen';
 
 export function HomeScreen() {
   const { signOut: _signOut, user } = useMockAuth();
+
+  /**
+   * Signs the user out. Currently delegates to the mock provider.
+   * When a real backend is added, call the API here (e.g. revoke the
+   * refresh token) before — or after — clearing local state.
+   *
+   * @example
+   *   await authApi.signOut();   // future backend call
+   *   _signOut();                // clear local state
+   */
+  const handleSignOut = useCallback(async () => {
+    // TODO: call real sign-out API endpoint here
+    _signOut();
+  }, [_signOut]);
   const { routes, isLoading, error, refetch, addRoute, updateRoute, deleteRoute } = useRoutes();
   const { disruptions } = useDisruptionsContext();
 
@@ -62,12 +76,23 @@ export function HomeScreen() {
   const renderListHeader = useCallback(
     () => (
       <View style={styles.topRow}>
+        <Pressable
+          accessibilityLabel='Sign out'
+          accessibilityRole='button'
+          hitSlop={12}
+          onPress={() => void handleSignOut()}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+        >
+          <LogOut color={authTheme.colors.primary} size={22} strokeWidth={2} />
+        </Pressable>
+
         <View style={styles.titleBlock}>
           <Text accessibilityRole='header' style={styles.title}>
             Your routes
           </Text>
           <Text style={styles.subtitle}>Tap a route to see details and actions.</Text>
         </View>
+
         <Pressable
           accessibilityLabel={`Route disruptions, ${disruptionCount} active`}
           accessibilityRole='button'
@@ -84,7 +109,7 @@ export function HomeScreen() {
         </Pressable>
       </View>
     ),
-    [disruptionCount],
+    [disruptionCount, handleSignOut],
   );
 
   if (!user) {
@@ -229,7 +254,6 @@ const styles = StyleSheet.create({
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.body,
     lineHeight: 22,
-    marginTop: authTheme.space.xs,
   },
   title: {
     color: authTheme.colors.foreground,
@@ -238,12 +262,12 @@ const styles = StyleSheet.create({
   },
   titleBlock: {
     flex: 1,
-    paddingRight: authTheme.space.sm,
+    paddingHorizontal: authTheme.space.sm,
   },
   topRow: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: authTheme.space.sm,
+    gap: 0,
     justifyContent: 'space-between',
     paddingTop: authTheme.space.sm,
   },

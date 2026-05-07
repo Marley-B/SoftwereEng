@@ -25,11 +25,11 @@ export const authTheme = {
     xs: 8,
   },
   typography: {
-    body: 17,
+    body: 15,
     caption: 14,
     headline: 30,
     label: 15,
     subhead: 18,
-    title: 22,
+    title: 20,
   },
 } as const;

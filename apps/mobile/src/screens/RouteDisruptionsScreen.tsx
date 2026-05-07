@@ -1,6 +1,7 @@
+import { useCallback } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft } from 'lucide-react-native';
+import { ArrowLeftFromLine } from 'lucide-react-native';
 
 import { authTheme } from '../features/auth/theme';
 import { DisruptionListItem } from '../features/disruptions/components/DisruptionListItem';
@@ -13,43 +14,48 @@ interface RouteDisruptionsScreenProps {
 export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) {
   const { disruptions, error, isLoading, refetch, dismiss } = useDisruptionsContext();
 
+  const renderListHeader = useCallback(
+    () => (
+      <View style={styles.topRow}>
+        <Pressable
+          accessibilityLabel='Go back'
+          accessibilityRole='button'
+          hitSlop={12}
+          onPress={onBack}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+        >
+          <ArrowLeftFromLine color={authTheme.colors.primary} size={22} strokeWidth={2} />
+        </Pressable>
+
+        <View style={styles.titleBlock}>
+          <Text accessibilityRole='header' style={styles.title}>
+            Route disruptions
+          </Text>
+          <Text style={styles.subtitle}>Live updates on service interruptions.</Text>
+        </View>
+      </View>
+    ),
+    [onBack],
+  );
+
   return (
     <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.safe}>
       <View style={styles.column}>
         <View style={styles.inner}>
-          {/* Header */}
-          <View style={styles.topRow}>
-            <Pressable
-              accessibilityLabel='Go back'
-              accessibilityRole='button'
-              hitSlop={12}
-              onPress={onBack}
-              style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
-            >
-              <ChevronLeft color={authTheme.colors.primary} size={22} strokeWidth={2.5} />
-              <Text style={styles.backLabel}>Back</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.titleBlock}>
-            <Text accessibilityRole='header' style={styles.title}>
-              Route disruptions
-            </Text>
-            <Text style={styles.subtitle}>Live updates on service interruptions.</Text>
-          </View>
-
-          {/* Body */}
           {error ? (
-            <View style={styles.centered}>
-              <Text style={styles.errorText}>{error}</Text>
-              <Pressable
-                accessibilityRole='button'
-                onPress={() => void refetch()}
-                style={({ pressed }) => [styles.retry, pressed && styles.retryPressed]}
-              >
-                <Text style={styles.retryLabel}>Try again</Text>
-              </Pressable>
-            </View>
+            <>
+              {renderListHeader()}
+              <View style={styles.centered}>
+                <Text style={styles.errorText}>{error}</Text>
+                <Pressable
+                  accessibilityRole='button'
+                  onPress={() => void refetch()}
+                  style={({ pressed }) => [styles.retry, pressed && styles.retryPressed]}
+                >
+                  <Text style={styles.retryLabel}>Try again</Text>
+                </Pressable>
+              </View>
+            </>
           ) : (
             <FlatList
               contentContainerStyle={styles.listContent}
@@ -65,6 +71,7 @@ export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) 
                   <Text style={styles.empty}>No disruptions reported.</Text>
                 )
               }
+              ListHeaderComponent={renderListHeader}
               renderItem={({ item }) => <DisruptionListItem disruption={item} onDismiss={dismiss} />}
               showsVerticalScrollIndicator={false}
               style={styles.listFlex}
@@ -77,24 +84,15 @@ export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) 
 }
 
 const styles = StyleSheet.create({
-  backBtn: {
+  iconBtn: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
     borderRadius: authTheme.radii.control,
-    flexDirection: 'row',
-    gap: 4,
-    marginHorizontal: -authTheme.space.xs,
+    justifyContent: 'center',
     minHeight: 44,
-    paddingHorizontal: authTheme.space.xs,
-    paddingVertical: authTheme.space.xs,
+    minWidth: 44,
   },
-  backBtnPressed: {
-    opacity: 0.65,
-  },
-  backLabel: {
-    color: authTheme.colors.primary,
-    fontSize: authTheme.typography.label,
-    fontWeight: '600',
+  iconBtnPressed: {
+    opacity: 0.6,
   },
   centered: {
     alignItems: 'center',
@@ -169,7 +167,6 @@ const styles = StyleSheet.create({
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.body,
     lineHeight: 22,
-    marginTop: authTheme.space.xs,
   },
   title: {
     color: authTheme.colors.foreground,
@@ -177,10 +174,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   titleBlock: {
-    paddingBottom: authTheme.space.md,
-    paddingTop: authTheme.space.xs,
+    flex: 1,
+    padding: authTheme.space.xs,
   },
   topRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
     paddingTop: authTheme.space.sm,
   },
 });
