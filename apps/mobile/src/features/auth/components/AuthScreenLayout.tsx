@@ -47,6 +47,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inner: {
+    alignSelf: "center",
     gap: authTheme.space.lg,
     maxWidth: 480,
     paddingHorizontal: authTheme.space.lg,
@@ -57,6 +58,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    alignItems: "center",
     flexGrow: 1,
     justifyContent: "center",
     paddingTop: authTheme.space.md,
