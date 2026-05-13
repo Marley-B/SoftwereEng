@@ -24,7 +24,8 @@ interface DisruptionsContextValue {
   disruptions: Disruption[];
   error: string | null;
   isLoading: boolean;
-  refetch: () => Promise<void>;
+  /** When `background` is true, keeps existing list visible (no full-screen loading). */
+  refetch: (opts?: { background?: boolean }) => Promise<void>;
   dismiss: (id: string) => Promise<void>;
 }
 
@@ -45,12 +46,15 @@ export function DisruptionsProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { background?: boolean }) => {
     if (!user) {
       setAll([]);
       return;
     }
-    setIsLoading(true);
+    const background = opts?.background === true;
+    if (!background) {
+      setIsLoading(true);
+    }
     setError(null);
     try {
       const data = await apiRequest<DisruptionDto[]>("/me/disruptions", { method: "GET" });
@@ -60,9 +64,13 @@ export function DisruptionsProvider({ children }: { children: ReactNode }) {
         e instanceof ApiError
           ? ((e.body as { error?: string } | null)?.error ?? e.message)
           : "Failed to load disruptions. Please try again.";
-      setError(msg);
+      if (!background) {
+        setError(msg);
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
   }, [user]);
 

@@ -29,10 +29,12 @@ export function DisruptionListItem({ disruption, onDismiss }: DisruptionListItem
 
       <Text style={styles.description}>{disruption.description}</Text>
 
-      <View style={styles.routesRow}>
-        <Text style={styles.routesLabel}>Affects: </Text>
-        <Text style={styles.routesValue}>{disruption.affectedRoutes.join(', ')}</Text>
-      </View>
+      {disruption.affectedRoutes.length > 0 ? (
+        <View style={styles.routesRow}>
+          <Text style={styles.routesLabel}>Affects: </Text>
+          <Text style={styles.routesValue}>{disruption.affectedRoutes.join(', ')}</Text>
+        </View>
+      ) : null}
 
       <Pressable
         accessibilityLabel='Dismiss disruption'
