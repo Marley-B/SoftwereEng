@@ -11,7 +11,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test ./test"
+    "test": "bun test ./test/*.test.ts"
   },
   "dependencies": {
     "luxon": "3.7.2",
