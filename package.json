@@ -15,6 +15,11 @@
     "dev:mobile": "bun run --filter @route-helper/mobile dev",
     "dev:api": "bun run --filter @route-helper/api dev",
     "dev:worker": "bun run --filter @route-helper/worker dev",
+    "test": "bun run test:shared && bun run test:mobile && bun run test:api && bun run test:worker",
+    "test:api": "bun run --filter @route-helper/api test",
+    "test:shared": "bun run --filter @route-helper/shared test",
+    "test:mobile": "bun run --filter @route-helper/mobile test",
+    "test:worker": "bun run --filter @route-helper/worker test",
     "typecheck": "bun run typecheck:all",
     "typecheck:all": "bun run --filter '*' typecheck"
   }
