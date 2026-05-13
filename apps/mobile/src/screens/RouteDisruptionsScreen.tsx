@@ -1,5 +1,13 @@
-import { useCallback } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeftFromLine } from 'lucide-react-native';
 
@@ -13,6 +21,21 @@ interface RouteDisruptionsScreenProps {
 
 export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) {
   const { disruptions, error, isLoading, refetch, dismiss } = useDisruptionsContext();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Worker writes to the API DB; reload when this screen opens so new items appear.
+  useEffect(() => {
+    void refetch({ background: true });
+  }, [refetch]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch({ background: true });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const renderListHeader = useCallback(
     () => (
@@ -61,6 +84,14 @@ export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) 
               contentContainerStyle={styles.listContent}
               data={isLoading ? [] : disruptions}
               keyExtractor={(item) => item.id}
+              refreshControl={
+                <RefreshControl
+                  colors={[authTheme.colors.primary]}
+                  onRefresh={() => void onRefresh()}
+                  refreshing={refreshing}
+                  tintColor={authTheme.colors.primary}
+                />
+              }
               ListEmptyComponent={
                 isLoading ? (
                   <View style={styles.listEmptyFill}>

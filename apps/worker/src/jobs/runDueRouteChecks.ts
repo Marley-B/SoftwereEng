@@ -11,7 +11,7 @@ import {
 } from "@route-helper/shared";
 import { sendExpoPushNotification } from "../notifications/expoPushClient.js";
 
-const OFFSETS_MIN = [-60, -30, -5] as const;
+const OFFSETS_MIN = [-60, -30, -10, -5] as const;
 const TRIGGER_WINDOW_MS = 5 * 60 * 1000;
 
 export interface RunDueChecksDeps {

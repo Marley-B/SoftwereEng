@@ -4,6 +4,16 @@ import { disruptions, pushTokens, routes } from "@route-helper/db";
 import { disruptionResponseSchema, pushTokenBodySchema } from "@route-helper/shared";
 import { createRequireAuth } from "../../hooks/requireAuth.js";
 
+function occurredAtToIso(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === "string") {
+    return new Date(value).toISOString();
+  }
+  return new Date(String(value)).toISOString();
+}
+
 export const registerMeRoutes: FastifyPluginAsync = async (app) => {
   const requireAuth = createRequireAuth(app.config.jwtSecret);
 
@@ -28,7 +38,7 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
     return rows.map(({ disruption, routeName }) =>
       disruptionResponseSchema.parse({
         id: disruption.id,
-        occurredAt: disruption.occurredAt.toISOString(),
+        occurredAt: occurredAtToIso(disruption.occurredAt),
         description: disruption.description,
         severity: disruption.severity,
         routeId: disruption.routeId,
