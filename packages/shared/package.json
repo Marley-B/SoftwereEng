@@ -10,7 +10,8 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test ./test"
   },
   "dependencies": {
     "luxon": "3.7.2",
