@@ -22,3 +22,23 @@ export function parseRouteTime(value: string, fallback: Date): Date {
   next.setHours(hours, minutes, 0, 0);
   return next;
 }
+
+/**
+ * Seconds between two wall-clock times (`H:mm` from {@link formatRouteTime}).
+ * If the arrival time is earlier on the clock than the start time, arrival is treated as the next day
+ * (overnight). Returns `null` when both resolve to the same instant.
+ */
+export function scheduledCommuteWindowSeconds(startHHmm: string, endHHmm: string): number | null {
+  const base = new Date();
+  base.setHours(0, 0, 0, 0);
+  const start = parseRouteTime(startHHmm, base);
+  const end = parseRouteTime(endHHmm, base);
+  let diffMs = end.getTime() - start.getTime();
+  if (diffMs === 0) {
+    return null;
+  }
+  if (diffMs < 0) {
+    diffMs += 24 * 60 * 60 * 1000;
+  }
+  return Math.floor(diffMs / 1000);
+}

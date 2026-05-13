@@ -5,7 +5,7 @@ import type { Disruption } from '../types';
 
 interface DisruptionListItemProps {
   disruption: Disruption;
-  onDismiss: (id: string) => void;
+  onDismiss: (id: string) => void | Promise<void>;
 }
 
 function formatOccurredAt(iso: string): string {
@@ -38,7 +38,7 @@ export function DisruptionListItem({ disruption, onDismiss }: DisruptionListItem
         accessibilityLabel='Dismiss disruption'
         accessibilityRole='button'
         hitSlop={8}
-        onPress={() => onDismiss(disruption.id)}
+        onPress={() => void onDismiss(disruption.id)}
         style={({ pressed }) => [styles.dismissBtn, pressed && styles.dismissBtnPressed]}
       >
         <Text style={styles.dismissLabel}>Dismiss</Text>

@@ -1,4 +1,11 @@
-/** Transit route shown on home; IDs align with future API entities. */
+import type {
+  PlaceRef,
+  RouteCreateBody,
+  RouteUpdateBody,
+  TransitSnapshot,
+} from "@route-helper/shared";
+
+/** Transit route shown on home (API shape subset + client fields). */
 export interface Route {
   id: string;
   name: string;
@@ -6,9 +13,15 @@ export interface Route {
   expectedArrival: string;
   departure: string;
   destination: string;
+  timeZone: string;
+  origin: PlaceRef;
+  destinationPlace: PlaceRef;
+  transitSnapshot: TransitSnapshot;
 }
 
-/** Payload for create/update before an id is assigned (add flow). */
+export type { RouteCreateBody, RouteUpdateBody };
+
+/** @deprecated Legacy mock shape — prefer RouteCreateBody in new flows. */
 export interface RouteDraft {
   departure: string;
   destination: string;

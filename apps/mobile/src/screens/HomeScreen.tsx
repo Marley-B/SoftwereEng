@@ -1,37 +1,36 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogOut, MessageSquareWarning } from 'lucide-react-native';
 
 import { AuthPrimaryButton } from '../features/auth/components/AuthButtons';
-import { useMockAuth } from '../features/auth/context/MockAuthProvider';
+import { useAuth } from '../features/auth/context/AuthProvider';
 import { authTheme } from '../features/auth/theme';
 import { useDisruptionsContext } from '../features/disruptions/context/DisruptionsProvider';
 import { RouteFormModal } from '../features/routes/components/RouteFormModal';
 import { RouteListItem } from '../features/routes/components/RouteListItem';
-import { makeRouteId } from '../features/routes/makeRouteId';
-import type { Route, RouteDraft } from '../features/routes/types';
+import type { Route, RouteCreateBody } from '../features/routes/types';
 import { useRoutes } from '../features/routes/useRoutes';
+import { registerExpoPushAndUpload } from '../lib/pushRegistration';
 import { RouteDisruptionsScreen } from './RouteDisruptionsScreen';
 
 export function HomeScreen() {
-  const { signOut: _signOut, user } = useMockAuth();
+  const { signOut: _signOut, user } = useAuth();
 
-  /**
-   * Signs the user out. Currently delegates to the mock provider.
-   * When a real backend is added, call the API here (e.g. revoke the
-   * refresh token) before — or after — clearing local state.
-   *
-   * @example
-   *   await authApi.signOut();   // future backend call
-   *   _signOut();                // clear local state
-   */
   const handleSignOut = useCallback(async () => {
-    // TODO: call real sign-out API endpoint here
-    _signOut();
+    await _signOut();
   }, [_signOut]);
-  const { routes, isLoading, error, refetch, addRoute, updateRoute, deleteRoute } = useRoutes();
+  const { routes, isLoading, error, refetch, createRoute, updateRoute, deleteRoute } = useRoutes();
   const { disruptions } = useDisruptionsContext();
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    void registerExpoPushAndUpload().catch(() => {
+      /* optional — user may deny permission */
+    });
+  }, [user]);
 
   const [formVisible, setFormVisible] = useState(false);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
@@ -55,20 +54,20 @@ export function HomeScreen() {
   }, []);
 
   const onSaveRoute = useCallback(
-    (draft: RouteDraft, editingId: string | null) => {
+    async (body: RouteCreateBody, editingId: string | null) => {
       if (editingId) {
-        updateRoute(editingId, draft);
+        await updateRoute(editingId, body);
       } else {
-        addRoute({ ...draft, id: makeRouteId() });
+        await createRoute(body);
       }
       closeForm();
     },
-    [addRoute, closeForm, updateRoute],
+    [createRoute, closeForm, updateRoute],
   );
 
   const onDelete = useCallback(
     (route: Route) => {
-      deleteRoute(route.id);
+      void deleteRoute(route.id);
     },
     [deleteRoute],
   );

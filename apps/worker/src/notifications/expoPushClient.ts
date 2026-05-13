@@ -5,6 +5,27 @@ export interface PushPayload {
   data?: Record<string, unknown>;
 }
 
-export const sendExpoPushNotification = async (_payload: PushPayload): Promise<void> => {
-  // Network call intentionally omitted in environment setup phase.
+/** Send via Expo Push API (https://docs.expo.dev/push-notifications/sending-notifications/). */
+export const sendExpoPushNotification = async (payload: PushPayload): Promise<void> => {
+  const res = await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Accept-Encoding": "gzip, deflate",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify([
+      {
+        to: payload.to,
+        sound: "default",
+        title: payload.title,
+        body: payload.body,
+        data: payload.data,
+      },
+    ]),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Expo push failed ${res.status}: ${text}`);
+  }
 };

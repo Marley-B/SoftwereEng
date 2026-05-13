@@ -8,7 +8,7 @@ import {
 } from "../components/AuthButtons";
 import { AuthScreenLayout } from "../components/AuthScreenLayout";
 import { AuthTextField } from "../components/AuthTextField";
-import { useMockAuth } from "../context/MockAuthProvider";
+import { useAuth } from "../context/AuthProvider";
 import { authTheme } from "../theme";
 import { validateEmail, validatePassword } from "../validation";
 
@@ -18,13 +18,14 @@ interface SignInScreenProps {
 }
 
 export function SignInScreen({ onBack, onNeedAccount }: SignInScreenProps) {
-  const { isBusy, signIn } = useMockAuth();
+  const { isBusy, signIn, authError, clearAuthError } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const submit = useCallback(async () => {
+    clearAuthError();
     const eErr = validateEmail(email);
     const pErr = validatePassword(password);
     setEmailError(eErr);
@@ -33,7 +34,7 @@ export function SignInScreen({ onBack, onNeedAccount }: SignInScreenProps) {
       return;
     }
     await signIn(email.trim(), password);
-  }, [email, password, signIn]);
+  }, [email, password, signIn, clearAuthError]);
 
   return (
     <AuthScreenLayout bottomInset={authTheme.space.lg}>
@@ -58,6 +59,7 @@ export function SignInScreen({ onBack, onNeedAccount }: SignInScreenProps) {
         onChangeText={(t) => {
           setEmail(t);
           setEmailError(null);
+          clearAuthError();
         }}
         placeholder="you@example.com"
         textContentType="emailAddress"
@@ -72,12 +74,17 @@ export function SignInScreen({ onBack, onNeedAccount }: SignInScreenProps) {
         onChangeText={(t) => {
           setPassword(t);
           setPasswordError(null);
+          clearAuthError();
         }}
         placeholder="Your password"
         secureTextEntry
         textContentType="password"
         value={password}
       />
+
+      {authError ? (
+        <Text style={styles.authError}>{authError}</Text>
+      ) : null}
 
       <AuthPrimaryButton
         disabled={isBusy}
@@ -102,6 +109,12 @@ const styles = StyleSheet.create({
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.body,
     lineHeight: 24,
+    marginTop: authTheme.space.sm,
+  },
+  authError: {
+    color: authTheme.colors.danger,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "600",
     marginTop: authTheme.space.sm,
   },
   title: {

@@ -1,7 +1,9 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useEffect, useState } from "react";
+import * as Localization from "expo-localization";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  ActivityIndicator,
   Dimensions,
   Keyboard,
   KeyboardAvoidingView,
@@ -13,17 +15,23 @@ import {
   Text,
   View,
 } from "react-native";
+import type { PlaceRef, TransitOption, TransitSnapshot } from "@route-helper/shared";
 import {
   AuthGhostButton,
   AuthPrimaryButton,
 } from "../../auth/components/AuthButtons";
 import { AuthTextField } from "../../auth/components/AuthTextField";
 import { authTheme } from "../../auth/theme";
-import { resolvePhotonLangFromEnvironment } from "../photonPlaces";
-import type { Route, RouteDraft } from "../types";
+import { ApiError, apiRequest } from "../../../lib/apiClient";
+import type { Route } from "../types";
+import type { RouteCreateBody } from "../types";
 import { PlaceAutocompleteField } from "./PlaceAutocompleteField";
 import { RouteEndpointsMap } from "./RouteEndpointsMap";
-import { formatRouteTime, parseRouteTime } from "../routeTimeUtils";
+import {
+  formatRouteTime,
+  parseRouteTime,
+  scheduledCommuteWindowSeconds,
+} from "../routeTimeUtils";
 
 const WINDOW_HEIGHT = Dimensions.get("window").height;
 const SHEET_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.94);
@@ -31,7 +39,7 @@ const SHEET_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.94);
 interface RouteFormModalProps {
   editingRoute: Route | null;
   onDismiss: () => void;
-  onSubmit: (draft: RouteDraft, editingId: string | null) => void;
+  onSubmit: (body: RouteCreateBody, editingId: string | null) => Promise<void>;
   visible: boolean;
 }
 
@@ -163,6 +171,10 @@ const pickerStyles = StyleSheet.create({
     overflow: "hidden",
     width: "100%",
   },
+  wheel: {
+    width: "100%",
+    height: 200,
+  },
 });
 
 // ─── Time field row (tappable display) ───────────────────────────────────────
@@ -200,19 +212,11 @@ export function RouteFormModal({
   onSubmit,
   visible,
 }: RouteFormModalProps) {
-  const [photonLang] = useState(resolvePhotonLangFromEnvironment);
-
   const [name, setName] = useState("");
   const [departure, setDeparture] = useState("");
   const [destination, setDestination] = useState("");
-  const [depCoords, setDepCoords] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
-  const [destCoords, setDestCoords] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
+  const [depPlace, setDepPlace] = useState<PlaceRef | null>(null);
+  const [destPlace, setDestPlace] = useState<PlaceRef | null>(null);
 
   const [startDate, setStartDate] = useState(defaultMorning);
   const [arrivalDate, setArrivalDate] = useState(() => {
@@ -223,6 +227,19 @@ export function RouteFormModal({
   const [webStart, setWebStart] = useState("9:00");
   const [webArrival, setWebArrival] = useState("10:00");
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
+
+  const [transitOptions, setTransitOptions] = useState<TransitOption[]>([]);
+  const [pickedOption, setPickedOption] = useState<TransitOption | null>(null);
+  const [transitLoading, setTransitLoading] = useState(false);
+  const [transitError, setTransitError] = useState<string | null>(null);
+  const [saveBusy, setSaveBusy] = useState(false);
+  /** Ignores stale HTTP responses when the user changes places or departure time quickly. */
+  const transitFetchGen = useRef(0);
+
+  const userTimeZone = Localization.getCalendars()[0]?.timeZone ?? "UTC";
+
+  const depCoords = depPlace ? { latitude: depPlace.lat, longitude: depPlace.lng } : null;
+  const destCoords = destPlace ? { latitude: destPlace.lat, longitude: destPlace.lng } : null;
 
   useEffect(() => {
     if (!visible) return;
@@ -235,8 +252,8 @@ export function RouteFormModal({
       setName(editingRoute.name);
       setDeparture(editingRoute.departure);
       setDestination(editingRoute.destination);
-      setDepCoords(null);
-      setDestCoords(null);
+      setDepPlace(editingRoute.origin);
+      setDestPlace(editingRoute.destinationPlace);
       setStartDate(parseRouteTime(editingRoute.startTime, morning));
       setArrivalDate(parseRouteTime(editingRoute.expectedArrival, ten));
       setWebStart(editingRoute.startTime);
@@ -245,17 +262,126 @@ export function RouteFormModal({
       setName("");
       setDeparture("");
       setDestination("");
-      setDepCoords(null);
-      setDestCoords(null);
+      setDepPlace(null);
+      setDestPlace(null);
       setStartDate(morning);
       setArrivalDate(ten);
       setWebStart(formatRouteTime(morning));
       setWebArrival(formatRouteTime(ten));
     }
+    setTransitOptions([]);
+    setPickedOption(null);
+    setTransitError(null);
     setActivePicker(null);
-  }, [visible, editingRoute]);
+    // Use route id, not the whole object — avoids re-running when the parent recreates route DTOs.
+  }, [visible, editingRoute?.id]);
 
-  const handleSubmit = () => {
+  const departureInstant = useCallback((): Date => {
+    if (Platform.OS === "web") {
+      return parseRouteTime(webStart, new Date());
+    }
+    return startDate;
+  }, [webStart, startDate]);
+
+  const loadTransitOptions = useCallback(async () => {
+    if (!depPlace || !destPlace) {
+      return;
+    }
+    const gen = ++transitFetchGen.current;
+    setTransitLoading(true);
+    setTransitError(null);
+    setPickedOption(null);
+    setTransitOptions([]);
+    try {
+      const res = await apiRequest<{ options: TransitOption[] }>("/routes/transit-options", {
+        method: "POST",
+        json: {
+          origin: depPlace,
+          destination: destPlace,
+          departureIso: departureInstant().toISOString(),
+          timeZone: userTimeZone,
+        },
+      });
+      if (transitFetchGen.current !== gen) {
+        return;
+      }
+      setTransitOptions(res.options);
+      if (res.options.length === 0) {
+        setTransitError("No transit routes found. Try different times or places.");
+      }
+    } catch (e) {
+      if (transitFetchGen.current !== gen) {
+        return;
+      }
+      const msg =
+        e instanceof ApiError
+          ? ((e.body as { error?: string } | null)?.error ?? e.message)
+          : "Could not load options";
+      setTransitError(msg);
+      setTransitOptions([]);
+    } finally {
+      if (transitFetchGen.current === gen) {
+        setTransitLoading(false);
+      }
+    }
+  }, [depPlace, destPlace, departureInstant, userTimeZone]);
+
+  const departureTimeKey =
+    Platform.OS === "web" ? webStart.trim() : String(startDate.getTime());
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    if (!depPlace || !destPlace) {
+      setTransitOptions([]);
+      setPickedOption(null);
+      setTransitError(null);
+      return;
+    }
+    const debounceMs = Platform.OS === "web" ? 500 : 0;
+    if (debounceMs === 0) {
+      void loadTransitOptions();
+      return;
+    }
+    const id = setTimeout(() => {
+      void loadTransitOptions();
+    }, debounceMs);
+    return () => clearTimeout(id);
+  }, [visible, depPlace?.placeId, destPlace?.placeId, departureTimeKey, loadTransitOptions]);
+
+  /** When a transit option is selected, it must not exceed start → expected arrival window. */
+  const transitWindowViolationMessage = useMemo(() => {
+    if (!pickedOption) {
+      return null;
+    }
+    let startHHmm: string;
+    let arrivalHHmm: string;
+    if (Platform.OS === "web") {
+      const timeRe = /^(\d{1,2}):(\d{2})$/;
+      if (!timeRe.test(webStart.trim()) || !timeRe.test(webArrival.trim())) {
+        return null;
+      }
+      const morning = defaultMorning();
+      startHHmm = formatRouteTime(parseRouteTime(webStart, morning));
+      arrivalHHmm = formatRouteTime(parseRouteTime(webArrival, morning));
+    } else {
+      startHHmm = formatRouteTime(startDate);
+      arrivalHHmm = formatRouteTime(arrivalDate);
+    }
+    const windowSec = scheduledCommuteWindowSeconds(startHHmm, arrivalHHmm);
+    if (windowSec === null || windowSec <= 0) {
+      return "Expected arrival must be after your start time.";
+    }
+    if (pickedOption.durationSeconds > windowSec) {
+      const tripMin = Math.ceil(pickedOption.durationSeconds / 60);
+      const windowMin = Math.max(1, Math.floor(windowSec / 60));
+      return `This trip takes about ${tripMin} min, but your start→arrival window is only ${windowMin} min. Allow more time or pick a shorter route.`;
+    }
+    return null;
+  }, [pickedOption, webStart, webArrival, startDate, arrivalDate]);
+
+  const handleSubmit = async () => {
     const trimmedName = name.trim();
     const trimmedDep = departure.trim();
     const trimmedDest = destination.trim();
@@ -284,10 +410,84 @@ export function RouteFormModal({
       expectedArrival = formatRouteTime(arrivalDate);
     }
 
-    onSubmit(
-      { departure: trimmedDep, destination: trimmedDest, expectedArrival, name: trimmedName, startTime },
-      editingRoute?.id ?? null,
-    );
+    if (!depPlace || !destPlace) {
+      Alert.alert("Places", "Pick departure and destination from suggestions so coordinates are set.");
+      return;
+    }
+
+    if (pickedOption) {
+      const windowSec = scheduledCommuteWindowSeconds(startTime, expectedArrival);
+      if (windowSec === null || windowSec <= 0) {
+        Alert.alert("Times", "Expected arrival must be after your start time.");
+        return;
+      }
+      if (pickedOption.durationSeconds > windowSec) {
+        const tripMin = Math.ceil(pickedOption.durationSeconds / 60);
+        const windowMin = Math.max(1, Math.floor(windowSec / 60));
+        Alert.alert(
+          "Transit",
+          `This trip takes about ${tripMin} min, but your start→arrival window is only ${windowMin} min. Allow more time or pick a shorter route.`,
+        );
+        return;
+      }
+    }
+
+    let snapshot: TransitSnapshot | null = null;
+    if (pickedOption) {
+      snapshot = {
+        optionsRequest: {
+          departureIso: departureInstant().toISOString(),
+          timeZone: userTimeZone,
+        },
+        selectedOptionId: pickedOption.id,
+        selectedPayload: pickedOption.payload as Record<string, unknown>,
+        baselineDurationSeconds: pickedOption.durationSeconds,
+        ...(pickedOption.staticDurationSeconds !== undefined
+          ? { baselineStaticDurationSeconds: pickedOption.staticDurationSeconds }
+          : {}),
+      };
+    } else if (
+      editingRoute &&
+      depPlace.placeId === editingRoute.origin.placeId &&
+      destPlace.placeId === editingRoute.destinationPlace.placeId &&
+      startTime === editingRoute.startTime &&
+      expectedArrival === editingRoute.expectedArrival
+    ) {
+      snapshot = editingRoute.transitSnapshot;
+    }
+
+    if (!snapshot) {
+      Alert.alert(
+        "Transit",
+        "Select one of the transit routes listed under Public transit — or keep places and times unchanged from when you saved this route.",
+      );
+      return;
+    }
+
+    const body: RouteCreateBody = {
+      name: trimmedName,
+      startTime,
+      expectedArrival,
+      timeZone: userTimeZone,
+      departureLabel: trimmedDep,
+      destinationLabel: trimmedDest,
+      origin: depPlace,
+      destination: destPlace,
+      transitSnapshot: snapshot,
+    };
+
+    setSaveBusy(true);
+    try {
+      await onSubmit(body, editingRoute?.id ?? null);
+    } catch (e) {
+      const msg =
+        e instanceof ApiError
+          ? ((e.body as { error?: string } | null)?.error ?? e.message)
+          : "Save failed";
+      Alert.alert("Could not save", msg);
+    } finally {
+      setSaveBusy(false);
+    }
   };
 
   const title = editingRoute ? "Edit route" : "Add route";
@@ -330,22 +530,28 @@ export function RouteFormModal({
 
               <PlaceAutocompleteField
                 label="Departure"
-                photonLang={photonLang}
-                onSelect={(label, coords) => {
+                onSelect={(label, coords, place) => {
                   setDeparture(label);
-                  if (coords) setDepCoords(coords);
+                  if (coords && place) {
+                    setDepPlace(place);
+                  } else {
+                    setDepPlace(null);
+                  }
                 }}
-                placeholder="Search any address worldwide"
+                placeholder="Search addresses (Google Maps)"
                 value={departure}
               />
               <PlaceAutocompleteField
                 label="Destination"
-                photonLang={photonLang}
-                onSelect={(label, coords) => {
+                onSelect={(label, coords, place) => {
                   setDestination(label);
-                  if (coords) setDestCoords(coords);
+                  if (coords && place) {
+                    setDestPlace(place);
+                  } else {
+                    setDestPlace(null);
+                  }
                 }}
-                placeholder="Search any address worldwide"
+                placeholder="Search addresses (Google Maps)"
                 value={destination}
               />
 
@@ -356,14 +562,18 @@ export function RouteFormModal({
                   <AuthTextField
                     autoCapitalize="none"
                     label="Start time"
-                    onChangeText={setWebStart}
+                    onChangeText={(t) => {
+                      setWebStart(t);
+                    }}
                     placeholder="9:00"
                     value={webStart}
                   />
                   <AuthTextField
                     autoCapitalize="none"
                     label="Expected arrival"
-                    onChangeText={setWebArrival}
+                    onChangeText={(t) => {
+                      setWebArrival(t);
+                    }}
                     placeholder="10:00"
                     value={webArrival}
                   />
@@ -382,6 +592,70 @@ export function RouteFormModal({
                   />
                 </>
               )}
+
+              <View style={styles.transitBlock}>
+                <View style={styles.transitHeaderRow}>
+                  <Text style={styles.transitTitle}>Transit options: </Text>
+                  {depPlace && destPlace ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={transitLoading}
+                      hitSlop={8}
+                      onPress={() => void loadTransitOptions()}
+                    >
+                      <Text style={[styles.transitRefresh, transitLoading && styles.transitRefreshDisabled]}>
+                        Refresh
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <Text style={styles.transitHint}>
+                  Routes appear automatically when both stops are set (using your start time). Tap a trip to
+                  use it for disruption checks.
+                </Text>
+                {transitLoading ? (
+                  <View style={styles.transitLoadingRow}>
+                    <ActivityIndicator color={authTheme.colors.primary} />
+                    <Text style={styles.transitLoadingLabel}>Finding routes…</Text>
+                  </View>
+                ) : null}
+                {transitError ? <Text style={styles.transitErr}>{transitError}</Text> : null}
+                {transitWindowViolationMessage ? (
+                  <Text style={styles.transitErr}>{transitWindowViolationMessage}</Text>
+                ) : null}
+                {transitOptions.map((opt) => {
+                  const selected = pickedOption?.id === opt.id;
+                  return (
+                    <Pressable
+                      key={opt.id}
+                      accessibilityRole="button"
+                      onPress={() => setPickedOption(opt)}
+                      style={({ pressed }) => [
+                        styles.optionRow,
+                        selected && styles.optionRowSelected,
+                        pressed && styles.optionRowPressed,
+                      ]}
+                    >
+                      <Text style={styles.optionBullet}>{selected ? "●" : "○"}</Text>
+                      <View style={styles.optionBody}>
+                        <Text style={styles.optionDuration}>{opt.label}</Text>
+                        {opt.segments?.map((seg, si) => (
+                          <View key={`${opt.id}-seg-${si}`} style={styles.segmentBlock}>
+                            <Text style={styles.segmentLine}>
+                              <Text style={styles.segmentMode}>{seg.modeLabel}</Text>
+                              {" · "}
+                              {seg.line}
+                            </Text>
+                            {seg.detail ? (
+                              <Text style={styles.segmentDetail}>{seg.detail}</Text>
+                            ) : null}
+                          </View>
+                        ))}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </ScrollView>
 
             <View style={styles.actions}>
@@ -390,8 +664,10 @@ export function RouteFormModal({
               </View>
               <View style={styles.actionGrow}>
                 <AuthPrimaryButton
+                  disabled={Boolean(transitWindowViolationMessage)}
                   label={editingRoute ? "Save" : "Add route"}
-                  onPress={handleSubmit}
+                  loading={saveBusy}
+                  onPress={() => void handleSubmit()}
                 />
               </View>
             </View>
@@ -404,6 +680,7 @@ export function RouteFormModal({
         label="Start time"
         onConfirm={(date) => {
           setStartDate(date);
+          setPickedOption(null);
           setActivePicker(null);
         }}
         onDismiss={() => setActivePicker(null)}
@@ -414,6 +691,7 @@ export function RouteFormModal({
         label="Expected arrival"
         onConfirm={(date) => {
           setArrivalDate(date);
+          setPickedOption(null);
           setActivePicker(null);
         }}
         onDismiss={() => setActivePicker(null)}
@@ -509,5 +787,97 @@ const styles = StyleSheet.create({
     color: authTheme.colors.foreground,
     fontSize: authTheme.typography.body,
     fontWeight: "700",
+  },
+  transitBlock: {
+    gap: authTheme.space.sm,
+    marginTop: authTheme.space.sm,
+  },
+  transitTitle: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.subhead,
+    fontWeight: "800",
+  },
+  transitHeaderRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  transitHint: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "600",
+  },
+  transitRefresh: {
+    color: authTheme.colors.primary,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "700",
+  },
+  transitRefreshDisabled: {
+    opacity: 0.5,
+  },
+  transitLoadingRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: authTheme.space.sm,
+    paddingVertical: authTheme.space.xs,
+  },
+  transitLoadingLabel: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "600",
+  },
+  transitErr: {
+    color: authTheme.colors.danger,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "600",
+  },
+  optionRow: {
+    alignItems: "flex-start",
+    borderColor: authTheme.colors.border,
+    borderRadius: authTheme.radii.control,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    flexDirection: "row",
+    gap: authTheme.space.sm,
+    paddingHorizontal: authTheme.space.md,
+    paddingVertical: authTheme.space.sm,
+  },
+  optionRowPressed: {
+    backgroundColor: authTheme.colors.background,
+  },
+  optionRowSelected: {
+    borderColor: authTheme.colors.primary,
+    backgroundColor: authTheme.colors.background,
+  },
+  optionBullet: {
+    color: authTheme.colors.primary,
+    fontSize: authTheme.typography.subhead,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  optionBody: {
+    flex: 1,
+    gap: 6,
+  },
+  optionDuration: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.body,
+    fontWeight: "700",
+  },
+  segmentBlock: {
+    gap: 2,
+  },
+  segmentLine: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "600",
+  },
+  segmentMode: {
+    color: authTheme.colors.foreground,
+    fontWeight: "800",
+  },
+  segmentDetail: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "600",
   },
 });

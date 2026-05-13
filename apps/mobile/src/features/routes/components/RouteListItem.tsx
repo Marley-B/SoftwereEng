@@ -26,7 +26,7 @@ interface RouteListItemProps {
 }
 
 function formatTimeframe(route: Route): string {
-  return `${route.departure} – ${route.expectedArrival}`;
+  return `${route.startTime} → ${route.expectedArrival}`;
 }
 
 interface DetailRowProps {

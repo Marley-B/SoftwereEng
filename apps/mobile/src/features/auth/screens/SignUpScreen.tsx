@@ -7,7 +7,7 @@ import {
 } from "../components/AuthButtons";
 import { AuthScreenLayout } from "../components/AuthScreenLayout";
 import { AuthTextField } from "../components/AuthTextField";
-import { useMockAuth } from "../context/MockAuthProvider";
+import { useAuth } from "../context/AuthProvider";
 import { authTheme } from "../theme";
 import {
   validateDisplayName,
@@ -21,7 +21,7 @@ interface SignUpScreenProps {
 }
 
 export function SignUpScreen({ onBack, onHaveAccount }: SignUpScreenProps) {
-  const { isBusy, signUp } = useMockAuth();
+  const { isBusy, signUp, authError, clearAuthError } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,6 +30,7 @@ export function SignUpScreen({ onBack, onHaveAccount }: SignUpScreenProps) {
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const submit = useCallback(async () => {
+    clearAuthError();
     const nErr = validateDisplayName(displayName);
     const eErr = validateEmail(email);
     const pErr = validatePassword(password);
@@ -40,7 +41,7 @@ export function SignUpScreen({ onBack, onHaveAccount }: SignUpScreenProps) {
       return;
     }
     await signUp(email.trim(), password, displayName.trim());
-  }, [displayName, email, password, signUp]);
+  }, [clearAuthError, displayName, email, password, signUp]);
 
   return (
     <AuthScreenLayout bottomInset={authTheme.space.lg}>
@@ -61,6 +62,7 @@ export function SignUpScreen({ onBack, onHaveAccount }: SignUpScreenProps) {
         onChangeText={(t) => {
           setDisplayName(t);
           setNameError(null);
+          clearAuthError();
         }}
         placeholder="Alex Rider"
         textContentType="name"
@@ -78,6 +80,7 @@ export function SignUpScreen({ onBack, onHaveAccount }: SignUpScreenProps) {
         onChangeText={(t) => {
           setEmail(t);
           setEmailError(null);
+          clearAuthError();
         }}
         placeholder="you@example.com"
         textContentType="emailAddress"
@@ -92,12 +95,15 @@ export function SignUpScreen({ onBack, onHaveAccount }: SignUpScreenProps) {
         onChangeText={(t) => {
           setPassword(t);
           setPasswordError(null);
+          clearAuthError();
         }}
         placeholder="At least 8 characters"
         secureTextEntry
         textContentType="newPassword"
         value={password}
       />
+
+      {authError ? <Text style={styles.authError}>{authError}</Text> : null}
 
       <AuthPrimaryButton
         disabled={isBusy}
@@ -122,6 +128,12 @@ const styles = StyleSheet.create({
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.body,
     lineHeight: 24,
+  },
+  authError: {
+    color: authTheme.colors.danger,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "600",
+    marginTop: authTheme.space.sm,
   },
   title: {
     color: authTheme.colors.foreground,

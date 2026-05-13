@@ -3,16 +3,24 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "run": "tsx src/index.ts",
+    "dev": "node ../../scripts/require-node-20.mjs && tsx watch src/index.ts",
+    "run": "node ../../scripts/require-node-20.mjs && tsx src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@route-helper/db": "workspace:*",
+    "@route-helper/google-routes": "workspace:*",
+    "@route-helper/shared": "workspace:*",
     "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.38.3",
+    "luxon": "^3.7.2",
     "node-cron": "^3.0.3",
-    "zod": "^3.23.8",
-    "@route-helper/shared": "workspace:*"
+    "postgres": "^3.4.5",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node-cron": "^3.0.11",
