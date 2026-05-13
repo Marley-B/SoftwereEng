@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node ../../scripts/require-node-20.mjs && bun test ./test/*.test.ts",
+    "test": "node ../../scripts/require-node-20.mjs && bun test ./test",
     "dev": "node ../../scripts/require-node-20.mjs && tsx watch src/index.ts",
     "run": "node ../../scripts/require-node-20.mjs && tsx src/index.ts",
     "typecheck": "tsc --noEmit"
