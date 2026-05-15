@@ -10,8 +10,7 @@ Environment scaffold for:
 
 1. Install Bun.
 2. Run `bun install`.
-3. Copy env files from `*.env.example`.
-4. Start each app:
+3. Start each app:
    - `bun run dev:mobile`
    - `bun run dev:api`
    - `bun run dev:worker`
