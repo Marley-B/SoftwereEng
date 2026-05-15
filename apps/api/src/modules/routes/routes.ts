@@ -12,6 +12,7 @@ import {
   routeUpdateBodySchema
 } from "@route-helper/shared";
 import { createRequireAuth } from "../../hooks/requireAuth.js";
+import { sendGoogleQuotaExceeded } from "../../lib/sendGoogleQuotaExceeded.js";
 
 type RouteRow = typeof routes.$inferSelect;
 
@@ -36,6 +37,10 @@ export const registerCommuteRoutes: FastifyPluginAsync = async (app) => {
     "/transit-options",
     { preHandler: requireAuth },
     async (request, reply) => {
+      const userId = request.auth?.userId;
+      if (!userId) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
       const parsed = transitOptionsBodySchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.status(400).send({ error: "Invalid body", details: parsed.error.flatten() });
@@ -44,6 +49,11 @@ export const registerCommuteRoutes: FastifyPluginAsync = async (app) => {
       const departure = new Date(departureIso);
       if (Number.isNaN(departure.getTime())) {
         return reply.status(400).send({ error: "Invalid departureIso" });
+      }
+      const quota = app.googleApiQuota.consumeTransit(userId);
+      if (!quota.ok) {
+        sendGoogleQuotaExceeded(reply, quota);
+        return;
       }
       const options = await computeTransitRouteOptions({
         apiKey: app.config.googleRoutesApiKey,

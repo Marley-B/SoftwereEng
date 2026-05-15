@@ -1,6 +1,7 @@
 import { placeRefSchema, type PlaceRef } from '@route-helper/shared';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { createRequireAuth } from '../../hooks/requireAuth.js';
+import { sendGoogleQuotaExceeded } from '../../lib/sendGoogleQuotaExceeded.js';
 
 const PLACES_AUTOCOMPLETE_NEW_URL = 'https://places.googleapis.com/v1/places:autocomplete';
 const PLACES_LEGACY_AUTOCOMPLETE = 'https://maps.googleapis.com/maps/api/place/autocomplete/json';
@@ -298,6 +299,25 @@ async function detailsLegacy(
   return { ok: true, place };
 }
 
+function consumePlacesQuota(
+  app: FastifyInstance,
+  request: FastifyRequest,
+  reply: FastifyReply,
+  sessionToken: string,
+): boolean {
+  const userId = request.auth?.userId;
+  if (!userId) {
+    void reply.status(401).send({ error: 'Unauthorized' });
+    return false;
+  }
+  const result = app.googleApiQuota.consumePlaces(userId, sessionToken);
+  if (!result.ok) {
+    sendGoogleQuotaExceeded(reply, result);
+    return false;
+  }
+  return true;
+}
+
 export const registerPlacesRoutes: FastifyPluginAsync = async (app) => {
   const requireAuth = createRequireAuth(app.config.jwtSecret);
   const apiKey = app.config.googleRoutesApiKey;
@@ -310,12 +330,19 @@ export const registerPlacesRoutes: FastifyPluginAsync = async (app) => {
     }
     const sessionToken = String(q.sessionToken ?? '').trim();
 
+    if (!consumePlacesQuota(app, request, reply, sessionToken)) {
+      return;
+    }
+
     const primary = await autocompleteNew(input, sessionToken, apiKey);
     if (primary.ok) {
       return { suggestions: primary.suggestions };
     }
 
     request.log.info('Places autocomplete: falling back to legacy endpoint (New API unavailable)');
+    if (!consumePlacesQuota(app, request, reply, sessionToken)) {
+      return;
+    }
     const legacy = await autocompleteLegacy(input, sessionToken, apiKey);
     if (!legacy.ok) {
       request.log.warn({ err: legacy.message }, 'Places autocomplete legacy failed');
@@ -332,12 +359,19 @@ export const registerPlacesRoutes: FastifyPluginAsync = async (app) => {
     }
     const sessionToken = String(q.sessionToken ?? '').trim();
 
+    if (!consumePlacesQuota(app, request, reply, sessionToken)) {
+      return;
+    }
+
     const primary = await detailsNew(placeId, sessionToken, apiKey);
     if (primary.ok) {
       return { place: primary.place };
     }
 
     request.log.info('Place details: falling back to legacy endpoint (New API unavailable)');
+    if (!consumePlacesQuota(app, request, reply, sessionToken)) {
+      return;
+    }
     const legacy = await detailsLegacy(placeId, sessionToken, apiKey);
     if (!legacy.ok) {
       request.log.warn({ err: legacy.message }, 'Place details legacy failed');
