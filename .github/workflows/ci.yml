@@ -11,6 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Run JavaScript-based actions (checkout, setup-node) on Node.js 24.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   # Matches apps/api and apps/worker integration tests (see test/helpers.ts).
   DATABASE_URL: postgres://route_helper:route_helper_ci@localhost:5432/route_helper
   JWT_SECRET: ci-jwt-secret
@@ -36,12 +38,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       # Bun 1.1.x treats `bun test ./test` as a module path; 1.2+ discovers tests in the folder.
       - name: Setup Bun
