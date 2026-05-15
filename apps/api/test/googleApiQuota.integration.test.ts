@@ -15,6 +15,7 @@ describeIntegration("Google API quota", () => {
   let app: FastifyInstance;
   let db: Database;
   let token = "";
+  let userId = "";
   const cleanupIds: string[] = [];
 
   beforeAll(async () => {
@@ -33,6 +34,7 @@ describeIntegration("Google API quota", () => {
     expect(reg.statusCode).toBe(201);
     const body = JSON.parse(reg.body) as { token: string; user: { id: string } };
     token = body.token;
+    userId = body.user.id;
     cleanupIds.push(body.user.id);
   });
 
@@ -45,29 +47,21 @@ describeIntegration("Google API quota", () => {
 
   test("returns 429 when places session quota is exceeded", async () => {
     const sessionToken = "quota-test-session-token-01";
-    const headers = { authorization: `Bearer ${token}` };
+    const limit = tightGoogleApiQuotaConfig.maxPerPlacesSession;
 
-    const first = await app.inject({
+    for (let i = 0; i < limit; i += 1) {
+      const result = app.googleApiQuota.consumePlaces(userId, sessionToken);
+      expect(result.ok).toBe(true);
+    }
+
+    const res = await app.inject({
       method: "GET",
       url: `/places/autocomplete?input=ams&sessionToken=${sessionToken}`,
-      headers,
+      headers: { authorization: `Bearer ${token}` },
     });
-    expect(first.statusCode).not.toBe(429);
 
-    const second = await app.inject({
-      method: "GET",
-      url: `/places/autocomplete?input=amst&sessionToken=${sessionToken}`,
-      headers,
-    });
-    expect(second.statusCode).not.toBe(429);
-
-    const third = await app.inject({
-      method: "GET",
-      url: `/places/autocomplete?input=amste&sessionToken=${sessionToken}`,
-      headers,
-    });
-    expect(third.statusCode).toBe(429);
-    const body = JSON.parse(third.body) as { code?: string; error?: string };
+    expect(res.statusCode).toBe(429);
+    const body = JSON.parse(res.body) as { code?: string; error?: string };
     expect(body.code).toBe("GOOGLE_API_QUOTA_EXCEEDED");
     expect(body.error).toContain("search session");
   });
