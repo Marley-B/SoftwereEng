@@ -4,7 +4,8 @@ import { createDb, runMigrations } from "@route-helper/db";
 import type { FastifyInstance } from "fastify";
 import { describe } from "bun:test";
 
-import { buildApp } from "../src/app.js";
+import { buildApp, type BuildAppOptions } from "../src/app.js";
+import type { GoogleApiQuotaConfig } from "../src/lib/googleApiQuota.js";
 
 export const hasDatabase = Boolean(process.env.DATABASE_URL);
 export const jwtSecret = process.env.JWT_SECRET ?? "integration-test-jwt-secret";
@@ -14,14 +15,23 @@ export const googleRoutesApiKey =
 /** Skip entire describe blocks when Postgres is not configured (e.g. CI without DATABASE_URL). */
 export const describeIntegration = hasDatabase ? describe : describe.skip;
 
-export async function createIntegrationApp(): Promise<{ app: FastifyInstance; db: Database }> {
+export async function createIntegrationApp(
+  overrides: Pick<BuildAppOptions, "googleApiQuota" | "googleApiQuotaConfig"> = {},
+): Promise<{ app: FastifyInstance; db: Database }> {
   const databaseUrl = process.env.DATABASE_URL!;
   await runMigrations(databaseUrl);
   const db = createDb(databaseUrl);
-  const app = buildApp({ db, jwtSecret, googleRoutesApiKey });
+  const app = buildApp({ db, jwtSecret, googleRoutesApiKey, ...overrides });
   await app.ready();
   return { app, db };
 }
+
+export const tightGoogleApiQuotaConfig: GoogleApiQuotaConfig = {
+  enabled: true,
+  maxPerPlacesSession: 2,
+  maxTransitPerUserPerHour: 1,
+  placesSessionTtlMs: 60_000,
+};
 
 export function minimalPlaceRef(suffix: string) {
   return {
