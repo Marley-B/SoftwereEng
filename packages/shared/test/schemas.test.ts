@@ -28,6 +28,7 @@ describe("shared zod schemas", () => {
       timeZone: "Europe/Berlin",
       departureLabel: "A",
       destinationLabel: "B",
+      daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
       origin: {
         address: "Addr 1",
         lat: 1,

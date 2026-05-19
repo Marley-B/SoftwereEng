@@ -64,6 +64,7 @@ export function minimalRouteCreateBody(routeName: string, unique: string) {
     timeZone: "Europe/Amsterdam",
     departureLabel: "Home",
     destinationLabel: "Work",
+    daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
     origin,
     destination: { ...destination, lat: origin.lat + 0.02 },
     transitSnapshot: minimalTransitSnapshot(),
