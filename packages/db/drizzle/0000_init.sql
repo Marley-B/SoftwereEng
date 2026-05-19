@@ -37,6 +37,7 @@ CREATE TABLE "routes" (
 	"origin" jsonb NOT NULL,
 	"destination" jsonb NOT NULL,
 	"transit_snapshot" jsonb NOT NULL,
+	"days_of_week" text[] DEFAULT ARRAY['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']::text[] NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
