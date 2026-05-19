@@ -579,7 +579,11 @@ export function RouteFormModal({
                 value={destination}
               />
 
-              <RouteEndpointsMap departure={depCoords} destination={destCoords} />
+              <RouteEndpointsMap
+                departure={depCoords}
+                destination={destCoords}
+                transitPayload={pickedOption?.payload ?? editingRoute?.transitSnapshot?.selectedPayload ?? null}
+              />
 
               {Platform.OS === "web" ? (
                 <>
