@@ -18,6 +18,7 @@ function mapDto(r: RouteResponse): Route {
     origin: r.origin,
     destinationPlace: r.destinationPlace,
     transitSnapshot: r.transitSnapshot,
+    daysOfWeek: r.daysOfWeek,
   };
 }
 

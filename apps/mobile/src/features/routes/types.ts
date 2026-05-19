@@ -17,6 +17,7 @@ export interface Route {
   origin: PlaceRef;
   destinationPlace: PlaceRef;
   transitSnapshot: TransitSnapshot;
+  daysOfWeek: string[];
 }
 
 export type { RouteCreateBody, RouteUpdateBody };
