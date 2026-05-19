@@ -12,16 +12,60 @@ export interface RouteEndpointCoordinate {
 interface RouteEndpointsMapProps {
   departure: RouteEndpointCoordinate | null;
   destination: RouteEndpointCoordinate | null;
+  transitPayload?: Record<string, unknown> | null;
 }
 
 const MAP_HEIGHT = 240;
 const STATIC_SIZE = '640x240';
+
+function extractEncodedPolylines(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return [];
+  }
+  const legs = (payload as Record<string, unknown>)['legs'];
+  if (!Array.isArray(legs) || legs.length === 0) {
+    return [];
+  }
+
+  const polylines: string[] = [];
+  for (const leg of legs) {
+    if (!leg || typeof leg !== 'object') {
+      continue;
+    }
+    const steps = (leg as Record<string, unknown>)['steps'];
+    if (!Array.isArray(steps)) {
+      continue;
+    }
+
+    for (const step of steps) {
+      if (!step || typeof step !== 'object') {
+        continue;
+      }
+      const polyline = (step as Record<string, unknown>)['polyline'];
+      if (!polyline || typeof polyline !== 'object') {
+        continue;
+      }
+      const encoded =
+        typeof (polyline as Record<string, unknown>)['encodedPolyline'] === 'string'
+          ? (polyline as Record<string, unknown>)['encodedPolyline'] as string
+          : typeof (polyline as Record<string, unknown>)['points'] === 'string'
+          ? (polyline as Record<string, unknown>)['points'] as string
+          : undefined;
+      if (encoded && encoded.trim().length > 0) {
+        polylines.push(encoded.trim());
+      }
+    }
+  }
+
+  return polylines;
+}
 
 /** Google Static Maps only (no Apple MapKit / native map views). */
 function buildStaticMapUrl(
   departure: RouteEndpointCoordinate | null,
   destination: RouteEndpointCoordinate | null,
   apiKey: string,
+  encodedPolylines: string[] = [],
 ): string | null {
   if (!apiKey.trim()) {
     return null;
@@ -42,24 +86,31 @@ function buildStaticMapUrl(
   if (destination) {
     params.append('markers', `color:0xc026d3|size:mid|label:A|${destination.latitude},${destination.longitude}`);
   }
-  if (departure && destination) {
+  if (encodedPolylines.length > 0) {
+    for (const polyline of encodedPolylines) {
+      params.append('path', `color:0x2563eb|weight:4|enc:${polyline}`);
+    }
+  } else if (departure && destination) {
     params.set(
       'path',
       `color:0x64748b99|weight:3|${departure.latitude},${departure.longitude}|${destination.latitude},${destination.longitude}`,
     );
   }
-
   return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
 }
 
-export function RouteEndpointsMap({ departure, destination }: RouteEndpointsMapProps) {
+export function RouteEndpointsMap({ departure, destination, transitPayload }: RouteEndpointsMapProps) {
   // Read EXPO_PUBLIC_* here (not only via app.config extra): Metro inlines these from .env;
   // extra is a fallback if the key is injected at build time without Metro env transform.
   const fromEnv = process.env.EXPO_PUBLIC_GOOGLE_MAPS_STATIC_API_KEY ?? '';
   const extra = Constants.expoConfig?.extra as { googleMapsStaticApiKey?: string } | undefined;
   const apiKey = (fromEnv || (extra?.googleMapsStaticApiKey ?? '')).trim();
 
-  const uri = useMemo(() => buildStaticMapUrl(departure, destination, apiKey), [departure, destination, apiKey]);
+  const encodedPolylines = useMemo(() => extractEncodedPolylines(transitPayload), [transitPayload]);
+  const uri = useMemo(
+    () => buildStaticMapUrl(departure, destination, apiKey, encodedPolylines),
+    [departure, destination, apiKey, encodedPolylines],
+  );
 
   const hasAny = Boolean(departure ?? destination);
 
