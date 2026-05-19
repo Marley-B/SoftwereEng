@@ -103,7 +103,16 @@ export const routeCreateBodySchema = z.object({
   destinationLabel: z.string().min(1),
   origin: placeRefSchema,
   destination: placeRefSchema,
-  transitSnapshot: transitSnapshotSchema
+  transitSnapshot: transitSnapshotSchema,
+  daysOfWeek: z.array(z.enum([
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday"
+  ])).min(1)
 });
 
 export const routeUpdateBodySchema = routeCreateBodySchema.partial();
@@ -118,7 +127,16 @@ export const routeResponseSchema = z.object({
   destination: z.string(),
   origin: placeRefSchema,
   destinationPlace: placeRefSchema,
-  transitSnapshot: transitSnapshotSchema
+  transitSnapshot: transitSnapshotSchema,
+  daysOfWeek: z.array(z.enum([
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday"
+  ])).min(1)
 });
 
 export type RouteResponse = z.infer<typeof routeResponseSchema>;
