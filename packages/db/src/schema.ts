@@ -35,6 +35,7 @@ export const routes = pgTable(
     origin: jsonb("origin").notNull(),
     destination: jsonb("destination").notNull(),
     transitSnapshot: jsonb("transit_snapshot").notNull(),
+    daysOfWeek: text("days_of_week").array().notNull().default(["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
   },

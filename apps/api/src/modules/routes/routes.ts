@@ -27,7 +27,8 @@ const toRouteResponse = (r: RouteRow) =>
     destination: r.destinationLabel,
     origin: placeRefSchema.parse(r.origin),
     destinationPlace: placeRefSchema.parse(r.destination),
-    transitSnapshot: transitSnapshotSchema.parse(r.transitSnapshot)
+    transitSnapshot: transitSnapshotSchema.parse(r.transitSnapshot),
+    daysOfWeek: r.daysOfWeek
   });
 
 export const registerCommuteRoutes: FastifyPluginAsync = async (app) => {
@@ -111,6 +112,7 @@ export const registerCommuteRoutes: FastifyPluginAsync = async (app) => {
         origin: body.origin,
         destination: body.destination,
         transitSnapshot: snapshot,
+        daysOfWeek: body.daysOfWeek,
         updatedAt: new Date()
       })
       .returning();
@@ -171,6 +173,7 @@ export const registerCommuteRoutes: FastifyPluginAsync = async (app) => {
         ...(patch.destinationLabel !== undefined ? { destinationLabel: patch.destinationLabel } : {}),
         ...(patch.origin !== undefined ? { origin: patch.origin } : {}),
         ...(patch.destination !== undefined ? { destination: patch.destination } : {}),
+        ...(patch.daysOfWeek !== undefined ? { daysOfWeek: patch.daysOfWeek } : {}),
         transitSnapshot: nextSnapshot,
         updatedAt: new Date()
       })

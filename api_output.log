@@ -1,0 +1,22 @@
+$ bun run --filter @route-helper/api dev
+@route-helper/api dev: {
+@route-helper/api dev:   severity_local: 'NOTICE',
+@route-helper/api dev:   severity: 'NOTICE',
+@route-helper/api dev:   code: '42P06',
+@route-helper/api dev:   message: 'schema "drizzle" already exists, skipping',
+@route-helper/api dev:   file: 'schemacmds.c',
+@route-helper/api dev:   line: '132',
+@route-helper/api dev:   routine: 'CreateSchemaCommand'
+@route-helper/api dev: }
+@route-helper/api dev: {
+@route-helper/api dev:   severity_local: 'NOTICE',
+@route-helper/api dev:   severity: 'NOTICE',
+@route-helper/api dev:   code: '42P07',
+@route-helper/api dev:   message: 'relation "__drizzle_migrations" already exists, skipping',
+@route-helper/api dev:   file: 'parse_utilcmd.c',
+@route-helper/api dev:   line: '207',
+@route-helper/api dev:   routine: 'transformCreateStmt'
+@route-helper/api dev: }
+@route-helper/api dev: {"level":30,"time":1779183154385,"pid":16649,"hostname":"DESKTOP-0N8OJBA","msg":"Server listening at http://10.255.255.254:3000"}
+@route-helper/api dev: {"level":30,"time":1779183154386,"pid":16649,"hostname":"DESKTOP-0N8OJBA","msg":"Server listening at http://127.0.0.1:3000"}
+@route-helper/api dev: {"level":30,"time":1779183154386,"pid":16649,"hostname":"DESKTOP-0N8OJBA","msg":"Server listening at http://172.29.64.124:3000"}

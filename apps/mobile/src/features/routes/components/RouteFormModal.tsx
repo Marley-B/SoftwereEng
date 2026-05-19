@@ -35,6 +35,15 @@ import {
 
 const WINDOW_HEIGHT = Dimensions.get("window").height;
 const SHEET_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.94);
+const WEEKDAYS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
 
 interface RouteFormModalProps {
   editingRoute: Route | null;
@@ -217,7 +226,7 @@ export function RouteFormModal({
   const [destination, setDestination] = useState("");
   const [depPlace, setDepPlace] = useState<PlaceRef | null>(null);
   const [destPlace, setDestPlace] = useState<PlaceRef | null>(null);
-
+  const [daysOfWeek, setDaysOfWeek] = useState<string[]>([...WEEKDAYS]);
   const [startDate, setStartDate] = useState(defaultMorning);
   const [arrivalDate, setArrivalDate] = useState(() => {
     const d = defaultMorning();
@@ -474,6 +483,7 @@ export function RouteFormModal({
       origin: depPlace,
       destination: destPlace,
       transitSnapshot: snapshot,
+      daysOfWeek: daysOfWeek as ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[],
     };
 
     setSaveBusy(true);
@@ -592,7 +602,31 @@ export function RouteFormModal({
                   />
                 </>
               )}
-
+              <View style={styles.weekdaysBlock}>
+                  <Text style={styles.weekdaysLabel}>Days of week:</Text>
+                  <View style={styles.weekdaysRow}>
+                    {WEEKDAYS.map((day) => (
+                      <Pressable
+                        key={day}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: daysOfWeek.includes(day) }}
+                        onPress={() => {
+                          setDaysOfWeek((prev) =>
+                            prev.includes(day)
+                              ? prev.filter((d) => d !== day)
+                              : [...prev, day]
+                          );
+                        }}
+                        style={[
+                          styles.weekdayBox,
+                          daysOfWeek.includes(day) && styles.weekdayBoxSelected,
+                        ]}
+                      >
+                        <Text style={styles.weekdayText}>{day.slice(0, 3).toUpperCase()}</Text>
+                      </Pressable>
+                    ))}
+                </View>
+              </View>
               <View style={styles.transitBlock}>
                 <View style={styles.transitHeaderRow}>
                   <Text style={styles.transitTitle}>Transit options: </Text>
@@ -879,5 +913,38 @@ const styles = StyleSheet.create({
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.caption,
     fontWeight: "600",
-  },
+  },weekdaysBlock: {
+  marginTop: authTheme.space.md,
+  marginBottom: authTheme.space.sm,
+},
+weekdaysLabel: {
+  color: authTheme.colors.foreground,
+  fontSize: authTheme.typography.label,
+  fontWeight: "600",
+  marginBottom: authTheme.space.xs,
+},
+weekdaysRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: authTheme.space.xs,
+  marginBottom: authTheme.space.xs,
+},
+weekdayBox: {
+  borderColor: authTheme.colors.border,
+  borderWidth: 1,
+  borderRadius: authTheme.radii.control,
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  marginRight: 4,
+  marginBottom: 4,
+  backgroundColor: authTheme.colors.surface,
+},
+weekdayBoxSelected: {
+  backgroundColor: authTheme.colors.primary,
+  borderColor: authTheme.colors.primary,
+},
+weekdayText: {
+  color: authTheme.colors.foreground,
+  fontWeight: "700",
+},
 });
