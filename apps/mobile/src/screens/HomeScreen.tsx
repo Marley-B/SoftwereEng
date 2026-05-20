@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogOut, MessageSquareWarning } from 'lucide-react-native';
 
+import { apiRequest } from '../lib/apiClient';
 import { AuthPrimaryButton } from '../features/auth/components/AuthButtons';
 import { useAuth } from '../features/auth/context/AuthProvider';
 import { authTheme } from '../features/auth/theme';
@@ -22,6 +23,7 @@ export function HomeScreen() {
   }, [_signOut]);
   const { routes, isLoading, error, refetch, createRoute, updateRoute, deleteRoute } = useRoutes();
   const { disruptions } = useDisruptionsContext();
+  const [testBusy, setTestBusy] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -42,6 +44,27 @@ export function HomeScreen() {
     setEditingRoute(null);
     setFormVisible(true);
   }, []);
+
+  const createTestDisruption = useCallback(async (severity: 'info' | 'warn') => {
+    if (testBusy) {
+      return;
+    }
+    setTestBusy(true);
+    try {
+      await apiRequest('/me/disruptions/test', {
+        method: 'POST',
+        json: {
+          severity,
+          description: severity === 'info' ? 'Test possible delay' : 'Test disruption',
+        },
+      });
+      await refetch();
+    } catch (e) {
+      // ignore — user can still see disruption list if the request failed
+    } finally {
+      setTestBusy(false);
+    }
+  }, [refetch, testBusy]);
 
   const openEditRoute = useCallback((route: Route) => {
     setEditingRoute(route);
@@ -90,6 +113,24 @@ export function HomeScreen() {
             Your routes
           </Text>
           <Text style={styles.subtitle}>Tap a route to see details and actions.</Text>
+          <View style={styles.testRow}>
+            <Pressable
+              accessibilityRole='button'
+              disabled={testBusy}
+              onPress={() => void createTestDisruption('info')}
+              style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
+            >
+              <Text style={styles.testLabel}>Test delay</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole='button'
+              disabled={testBusy}
+              onPress={() => void createTestDisruption('warn')}
+              style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
+            >
+              <Text style={styles.testLabel}>Test disruption</Text>
+            </Pressable>
+          </View>
         </View>
 
         <Pressable
@@ -262,6 +303,27 @@ const styles = StyleSheet.create({
   titleBlock: {
     flex: 1,
     paddingHorizontal: authTheme.space.sm,
+  },
+  testRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: authTheme.space.xs,
+    marginTop: authTheme.space.xs,
+  },
+  testBtn: {
+    borderColor: authTheme.colors.border,
+    borderRadius: authTheme.radii.control,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    paddingHorizontal: authTheme.space.sm,
+    paddingVertical: authTheme.space.xs,
+  },
+  testBtnPressed: {
+    opacity: 0.6,
+  },
+  testLabel: {
+    color: authTheme.colors.primary,
+    fontSize: authTheme.typography.caption,
+    fontWeight: '700',
   },
   topRow: {
     alignItems: 'center',
