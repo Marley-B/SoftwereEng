@@ -92,4 +92,44 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
       });
     return { ok: true };
   });
+
+  // Test-only: create a fake disruption for the authenticated user.
+  // Useful for manual testing of mobile UX without waiting for the worker.
+  app.post("/disruptions/test", { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.auth?.userId;
+    if (!userId) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const body = request.body as { severity?: string; description?: string; routeId?: string } | undefined;
+    const severity = body?.severity === "info" ? "info" : "warn";
+    const description = body?.description ?? (severity === "info" ? "Possible delay (test)" : "Route disruption (test)");
+    const routeId = body?.routeId ?? null;
+
+    const [row] = await app.db
+      .insert(disruptions)
+      .values({ userId, routeId, description, severity })
+      .returning();
+
+    if (!row) {
+      return reply.status(500).send({ error: "Failed to create test disruption" });
+    }
+
+    // Resolve affected route name if available
+    let affectedRoutes: string[] = [];
+    if (row.routeId) {
+      const [r] = await app.db.select({ name: routes.name }).from(routes).where(eq(routes.id, row.routeId)).limit(1);
+      if (r) {
+        affectedRoutes = [r.name];
+      }
+    }
+
+    return disruptionResponseSchema.parse({
+      id: row.id,
+      occurredAt: occurredAtToIso(row.occurredAt),
+      description: row.description,
+      severity: row.severity,
+      routeId: row.routeId,
+      affectedRoutes,
+    });
+  });
 };
