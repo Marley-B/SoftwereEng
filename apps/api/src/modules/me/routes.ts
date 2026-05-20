@@ -103,24 +103,36 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as { severity?: string; description?: string; routeId?: string } | undefined;
     const severity = body?.severity === "info" ? "info" : "warn";
     const description = body?.description ?? (severity === "info" ? "Possible delay (test)" : "Route disruption (test)");
-    const routeId = body?.routeId ?? null;
+
+    let route: { id: string; name: string } | undefined;
+    if (body?.routeId) {
+      const [found] = await app.db
+        .select({ id: routes.id, name: routes.name })
+        .from(routes)
+        .where(and(eq(routes.userId, userId), eq(routes.id, body.routeId)))
+        .limit(1);
+      route = found;
+    } else {
+      const [found] = await app.db
+        .select({ id: routes.id, name: routes.name })
+        .from(routes)
+        .where(eq(routes.userId, userId))
+        .orderBy(desc(routes.createdAt))
+        .limit(1);
+      route = found;
+    }
+
+    if (!route) {
+      return reply.status(404).send({ error: "No route found for this user" });
+    }
 
     const [row] = await app.db
       .insert(disruptions)
-      .values({ userId, routeId, description, severity })
+      .values({ userId, routeId: route.id, description, severity })
       .returning();
 
     if (!row) {
       return reply.status(500).send({ error: "Failed to create test disruption" });
-    }
-
-    // Resolve affected route name if available
-    let affectedRoutes: string[] = [];
-    if (row.routeId) {
-      const [r] = await app.db.select({ name: routes.name }).from(routes).where(eq(routes.id, row.routeId)).limit(1);
-      if (r) {
-        affectedRoutes = [r.name];
-      }
     }
 
     return disruptionResponseSchema.parse({
@@ -129,7 +141,7 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
       description: row.description,
       severity: row.severity,
       routeId: row.routeId,
-      affectedRoutes,
+      affectedRoutes: [route.name],
     });
   });
 };
