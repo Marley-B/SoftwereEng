@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Localization from "expo-localization";
 import * as Location from "expo-location";
 import { MapPin, Route, Save, Square } from "lucide-react-native";
@@ -12,6 +12,11 @@ import {
 import { authTheme } from "../../auth/theme";
 import type { DetectedRouteDraft } from "../types";
 import { useRouteDetectionTracking } from "../locationTracking";
+import {
+  notifyPotentialRouteDetected,
+  resetDetectedRouteNotificationMemory,
+  routeNotificationKey,
+} from "../routeDetectionNotifications";
 import { RouteEndpointsMap } from "./RouteEndpointsMap";
 
 const home = { lat: 40.4168, lng: -3.7038 };
@@ -48,6 +53,10 @@ function formatDays(days: string[]): string {
 
 function routeTitle(route: DetectedRecurringRoute): string {
   return `${route.typicalDepartureTime} -> ${route.typicalArrivalTime}`;
+}
+
+function routeNotificationMessage(route: DetectedRecurringRoute): string {
+  return `${routeTitle(route)} on ${formatDays(route.daysOfWeek)}. Review it in Detected frequent routes.`;
 }
 
 function fallbackEndpointLabel(kind: "destination" | "origin", index: number): string {
@@ -195,6 +204,24 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
       return;
     }
     let cancelled = false;
+    void (async () => {
+      for (const route of result.recurringRoutes) {
+        const sent = await notifyPotentialRouteDetected(route);
+        if (!sent && !cancelled) {
+          Alert.alert("Potential frequent route found", routeNotificationMessage(route));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasRun, result.recurringRoutes.map(routeNotificationKey).join(",")]);
+
+  useEffect(() => {
+    if (!hasRun || result.recurringRoutes.length === 0) {
+      return;
+    }
+    let cancelled = false;
     const endpoints = result.recurringRoutes.flatMap((route) => [route.origin, route.destination]);
     const missing = endpoints.filter((endpoint) => endpointLabels[coordinateKey(endpoint)] === undefined);
     if (missing.length === 0) {
@@ -311,6 +338,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
           accessibilityRole="button"
           onPress={() => {
             setShowDemoData(false);
+            resetDetectedRouteNotificationMemory();
             tracker.clearSamples();
           }}
           style={({ pressed }) => [styles.secondaryAction, pressed && styles.secondaryActionPressed]}
