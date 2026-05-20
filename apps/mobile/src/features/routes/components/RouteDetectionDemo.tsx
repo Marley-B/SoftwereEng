@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Localization from "expo-localization";
-import { MapPin, Route, Square } from "lucide-react-native";
+import * as Location from "expo-location";
+import { MapPin, Route, Save, Square } from "lucide-react-native";
 import {
   detectRecurringRoutes,
   type DetectedRecurringRoute,
@@ -9,7 +10,9 @@ import {
 } from "@route-helper/shared";
 
 import { authTheme } from "../../auth/theme";
+import type { DetectedRouteDraft } from "../types";
 import { useRouteDetectionTracking } from "../locationTracking";
+import { RouteEndpointsMap } from "./RouteEndpointsMap";
 
 const home = { lat: 40.4168, lng: -3.7038 };
 const work = { lat: 40.452, lng: -3.688 };
@@ -47,9 +50,137 @@ function routeTitle(route: DetectedRecurringRoute): string {
   return `${route.typicalDepartureTime} -> ${route.typicalArrivalTime}`;
 }
 
-export function RouteDetectionDemo() {
+function fallbackEndpointLabel(kind: "destination" | "origin", index: number): string {
+  return kind === "origin" ? `Detected origin ${index + 1}` : `Detected destination ${index + 1}`;
+}
+
+function coordinateKey(endpoint: { lat: number; lng: number }): string {
+  return `${endpoint.lat.toFixed(5)},${endpoint.lng.toFixed(5)}`;
+}
+
+function coordinateLabel(endpoint: { lat: number; lng: number }): string {
+  return `${endpoint.lat.toFixed(5)}, ${endpoint.lng.toFixed(5)}`;
+}
+
+function demoEndpointLabel(endpoint: { lat: number; lng: number }): string | null {
+  const nearHome = Math.abs(endpoint.lat - home.lat) < 0.002 && Math.abs(endpoint.lng - home.lng) < 0.002;
+  const nearWork = Math.abs(endpoint.lat - work.lat) < 0.002 && Math.abs(endpoint.lng - work.lng) < 0.002;
+  if (nearHome) {
+    return "Puerta del Sol, Madrid";
+  }
+  if (nearWork) {
+    return "North Madrid office area";
+  }
+  return null;
+}
+
+function formatGeocodeAddress(address: Location.LocationGeocodedAddress): string | null {
+  const parts = [
+    address.name,
+    address.street,
+    address.city ?? address.district,
+    address.region,
+  ]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? [...new Set(parts)].join(", ") : null;
+}
+
+function toDetectedDraft(
+  route: DetectedRecurringRoute,
+  index: number,
+  labels: { destinationLabel: string; originLabel: string },
+): DetectedRouteDraft {
+  return {
+    daysOfWeek: route.daysOfWeek,
+    departureLabel: labels.originLabel,
+    destination: {
+      address: labels.destinationLabel,
+      lat: route.destination.lat,
+      lng: route.destination.lng,
+      placeId: `detected-destination-${route.destination.id}`,
+    },
+    destinationLabel: labels.destinationLabel,
+    expectedArrival: route.typicalArrivalTime,
+    id: `${route.origin.id}-${route.destination.id}-${index}`,
+    name: `Detected route ${index + 1}`,
+    origin: {
+      address: labels.originLabel,
+      lat: route.origin.lat,
+      lng: route.origin.lng,
+      placeId: `detected-origin-${route.origin.id}`,
+    },
+    startTime: route.typicalDepartureTime,
+  };
+}
+
+interface DetectedRouteCardProps {
+  expanded: boolean;
+  index: number;
+  onSave: (route: DetectedRecurringRoute, index: number, labels: { destinationLabel: string; originLabel: string }) => void;
+  onToggle: () => void;
+  route: DetectedRecurringRoute;
+  labels: { destinationLabel: string; originLabel: string };
+}
+
+function DetectedRouteCard({ expanded, index, labels, onSave, onToggle, route }: DetectedRouteCardProps) {
+  return (
+    <View style={styles.routeCard}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={onToggle}
+        style={({ pressed }) => [styles.routeHeader, pressed && styles.routeHeaderPressed]}
+      >
+        <View style={styles.routeHeaderText}>
+          <Text style={styles.routeName}>Detected route {index + 1}</Text>
+          <Text style={styles.routeMeta}>{routeTitle(route)}</Text>
+        </View>
+        <Text style={styles.routeChevron}>{expanded ? "▾" : "▸"}</Text>
+      </Pressable>
+
+      {expanded ? (
+        <View style={styles.routeDetails}>
+          <View style={styles.endpointBlock}>
+            <Text style={styles.endpointLabel}>Start point</Text>
+            <Text style={styles.endpointValue}>{labels.originLabel}</Text>
+          </View>
+          <View style={styles.endpointBlock}>
+            <Text style={styles.endpointLabel}>End point</Text>
+            <Text style={styles.endpointValue}>{labels.destinationLabel}</Text>
+          </View>
+          <RouteEndpointsMap
+            departure={{ latitude: route.origin.lat, longitude: route.origin.lng }}
+            destination={{ latitude: route.destination.lat, longitude: route.destination.lng }}
+            transitPayload={null}
+          />
+          <Text style={styles.resultLine}>Trips found: {route.tripCount}</Text>
+          <Text style={styles.resultLine}>Typical time: {routeTitle(route)}</Text>
+          <Text style={styles.resultLine}>Days: {formatDays(route.daysOfWeek)}</Text>
+          <Text style={styles.resultLine}>Confidence: {Math.round(route.confidence * 100)}%</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onSave(route, index, labels)}
+            style={({ pressed }) => [styles.saveAction, pressed && styles.saveActionPressed]}
+          >
+            <Save color={authTheme.colors.onPrimary} size={17} strokeWidth={2.4} />
+            <Text style={styles.saveActionLabel}>Save as route</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+interface RouteDetectionDemoProps {
+  onSaveCandidate: (draft: DetectedRouteDraft) => void;
+}
+
+export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps) {
   const [hasRun, setHasRun] = useState(false);
   const [showDemoData, setShowDemoData] = useState(false);
+  const [expandedRoutes, setExpandedRoutes] = useState<Record<string, boolean>>({});
+  const [endpointLabels, setEndpointLabels] = useState<Record<string, string>>({});
   const tracker = useRouteDetectionTracking();
   const userTimeZone = Localization.getCalendars()[0]?.timeZone ?? "UTC";
   const activeSamples = showDemoData ? demoSamples() : tracker.samples;
@@ -57,8 +188,67 @@ export function RouteDetectionDemo() {
     () => detectRecurringRoutes(activeSamples, { timeZone: userTimeZone }),
     [activeSamples, userTimeZone],
   );
-  const route = result.recurringRoutes[0];
   const canStop = tracker.isTracking || tracker.isBackgroundTracking;
+
+  useEffect(() => {
+    if (!hasRun || result.recurringRoutes.length === 0) {
+      return;
+    }
+    let cancelled = false;
+    const endpoints = result.recurringRoutes.flatMap((route) => [route.origin, route.destination]);
+    const missing = endpoints.filter((endpoint) => endpointLabels[coordinateKey(endpoint)] === undefined);
+    if (missing.length === 0) {
+      return;
+    }
+
+    void (async () => {
+      const resolved: Record<string, string> = {};
+      for (const endpoint of missing) {
+        const key = coordinateKey(endpoint);
+        try {
+          const [address] = await Location.reverseGeocodeAsync({
+            latitude: endpoint.lat,
+            longitude: endpoint.lng,
+          });
+          resolved[key] = address ? formatGeocodeAddress(address) ?? coordinateLabel(endpoint) : coordinateLabel(endpoint);
+        } catch {
+          resolved[key] = coordinateLabel(endpoint);
+        }
+      }
+      if (!cancelled) {
+        setEndpointLabels((prev) => ({ ...prev, ...resolved }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [endpointLabels, hasRun, result.recurringRoutes]);
+
+  const toggleRoute = (route: DetectedRecurringRoute, index: number) => {
+    const key = `${route.origin.id}-${route.destination.id}-${index}`;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedRoutes((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
+  };
+
+  const labelsForRoute = (route: DetectedRecurringRoute, index: number) => ({
+    destinationLabel:
+      (showDemoData ? demoEndpointLabel(route.destination) : null) ??
+      endpointLabels[coordinateKey(route.destination)] ??
+      fallbackEndpointLabel("destination", index),
+    originLabel:
+      (showDemoData ? demoEndpointLabel(route.origin) : null) ??
+      endpointLabels[coordinateKey(route.origin)] ??
+      fallbackEndpointLabel("origin", index),
+  });
+
+  const saveCandidate = (
+    route: DetectedRecurringRoute,
+    index: number,
+    labels: { destinationLabel: string; originLabel: string },
+  ) => {
+    onSaveCandidate(toDetectedDraft(route, index, labels));
+  };
 
   return (
     <View style={styles.panel}>
@@ -138,15 +328,23 @@ export function RouteDetectionDemo() {
           <Text style={styles.resultLine}>Stops found: {result.stops.length}</Text>
           <Text style={styles.resultLine}>Permission: {tracker.permissionStatus ?? "unknown"}</Text>
           {tracker.error ? <Text style={styles.errorLine}>{tracker.error}</Text> : null}
-          {route ? (
+          {result.recurringRoutes.length > 0 ? (
             <>
-              <Text style={styles.resultTitle}>Detected recurring route</Text>
-              <Text style={styles.resultLine}>Trips found: {route.tripCount}</Text>
-              <Text style={styles.resultLine}>Typical time: {routeTitle(route)}</Text>
-              <Text style={styles.resultLine}>Days: {formatDays(route.daysOfWeek)}</Text>
-              <Text style={styles.resultLine}>
-                Confidence: {Math.round(route.confidence * 100)}%
-              </Text>
+              <Text style={styles.resultTitle}>Detected routes</Text>
+              {result.recurringRoutes.map((detectedRoute, index) => {
+                const key = `${detectedRoute.origin.id}-${detectedRoute.destination.id}-${index}`;
+                return (
+                  <DetectedRouteCard
+                    key={key}
+                    expanded={expandedRoutes[key] ?? true}
+                    index={index}
+                    labels={labelsForRoute(detectedRoute, index)}
+                    onSave={saveCandidate}
+                    onToggle={() => toggleRoute(detectedRoute, index)}
+                    route={detectedRoute}
+                  />
+                );
+              })}
             </>
           ) : (
             <Text style={styles.resultLine}>No recurring route found yet.</Text>
@@ -188,18 +386,25 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   panel: {
-    backgroundColor: authTheme.colors.surface,
-    borderColor: authTheme.colors.border,
-    borderRadius: authTheme.radii.control,
-    borderWidth: StyleSheet.hairlineWidth * 2,
     gap: authTheme.space.sm,
-    marginTop: authTheme.space.md,
-    padding: authTheme.space.md,
   },
   errorLine: {
     color: authTheme.colors.danger,
     fontSize: authTheme.typography.caption,
     fontWeight: "700",
+  },
+  endpointBlock: {
+    gap: 2,
+  },
+  endpointLabel: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "700",
+  },
+  endpointValue: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "600",
   },
   result: {
     borderTopColor: authTheme.colors.border,
@@ -216,6 +421,66 @@ const styles = StyleSheet.create({
     color: authTheme.colors.foreground,
     fontSize: authTheme.typography.label,
     fontWeight: "800",
+  },
+  routeCard: {
+    borderColor: authTheme.colors.border,
+    borderRadius: authTheme.radii.control,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    overflow: "hidden",
+  },
+  routeChevron: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.subhead,
+    fontWeight: "800",
+    marginLeft: authTheme.space.sm,
+  },
+  routeDetails: {
+    borderTopColor: authTheme.colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+    padding: authTheme.space.sm,
+  },
+  routeHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: authTheme.space.sm,
+  },
+  routeHeaderPressed: {
+    backgroundColor: authTheme.colors.background,
+  },
+  routeHeaderText: {
+    flex: 1,
+    gap: 2,
+  },
+  routeMeta: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "600",
+  },
+  routeName: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.label,
+    fontWeight: "800",
+  },
+  saveAction: {
+    alignItems: "center",
+    backgroundColor: authTheme.colors.primary,
+    borderRadius: authTheme.radii.control,
+    flexDirection: "row",
+    gap: authTheme.space.xs,
+    justifyContent: "center",
+    marginTop: authTheme.space.sm,
+    minHeight: 44,
+    paddingHorizontal: authTheme.space.md,
+  },
+  saveActionLabel: {
+    color: authTheme.colors.onPrimary,
+    fontSize: authTheme.typography.label,
+    fontWeight: "700",
+  },
+  saveActionPressed: {
+    backgroundColor: authTheme.colors.primaryPressed,
   },
   secondaryAction: {
     alignItems: "center",

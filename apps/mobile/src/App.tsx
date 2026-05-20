@@ -1,4 +1,4 @@
-import { StyleSheet, View, ActivityIndicator } from "react-native";
+import { StyleSheet, View, ActivityIndicator, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthNavigator } from "./features/auth/AuthNavigator";
@@ -40,5 +40,11 @@ const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
+    ...(Platform.OS === "web"
+      ? {
+          height: "100vh" as never,
+          overflowY: "auto" as never,
+        }
+      : {}),
   },
 });
