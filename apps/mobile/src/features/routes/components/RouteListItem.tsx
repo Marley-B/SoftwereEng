@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import { authTheme } from "../../auth/theme";
+import { RouteEndpointsMap } from "./RouteEndpointsMap";
 import type { Route } from "../types";
 
 if (
@@ -92,10 +93,13 @@ export function RouteListItem({ onDelete, onEdit, route }: RouteListItemProps) {
 
       {expanded ? (
         <View style={styles.details}>
-          <DetailRow label="Start time" value={route.startTime} />
-          <DetailRow label="Expected arrival" value={route.expectedArrival} />
           <DetailRow label="Departure" value={route.departure} />
           <DetailRow label="Destination" value={route.destination} />
+          <RouteEndpointsMap
+            departure={route.origin}
+            destination={route.destinationPlace}
+            transitPayload={route.transitSnapshot?.selectedPayload ?? null}
+          />
 
           <View style={styles.actions}>
             <Pressable

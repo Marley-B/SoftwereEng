@@ -83,7 +83,7 @@ export const computeTransitRouteOptions = async (
       "X-Goog-Api-Key": params.apiKey,
       // Include full steps so we can read travelMode, transitDetails (line, vehicle, stops), and walk instructions.
       "X-Goog-FieldMask":
-        "routes.duration,routes.staticDuration,routes.localizedValues,routes.legs.steps.travelMode,routes.legs.steps.staticDuration,routes.legs.steps.navigationInstruction,routes.legs.steps.localizedValues,routes.legs.steps.transitDetails"
+        "routes.duration,routes.staticDuration,routes.localizedValues,routes.legs.steps.travelMode,routes.legs.steps.staticDuration,routes.legs.steps.navigationInstruction,routes.legs.steps.localizedValues,routes.legs.steps.transitDetails,routes.legs.steps.polyline"
     },
     body: JSON.stringify(body)
   });

@@ -267,6 +267,7 @@ export function RouteFormModal({
       setArrivalDate(parseRouteTime(editingRoute.expectedArrival, ten));
       setWebStart(editingRoute.startTime);
       setWebArrival(editingRoute.expectedArrival);
+      setDaysOfWeek(editingRoute.daysOfWeek ?? [...WEEKDAYS]);
     } else {
       setName("");
       setDeparture("");
@@ -277,6 +278,7 @@ export function RouteFormModal({
       setArrivalDate(ten);
       setWebStart(formatRouteTime(morning));
       setWebArrival(formatRouteTime(ten));
+      setDaysOfWeek([...WEEKDAYS]);
     }
     setTransitOptions([]);
     setPickedOption(null);
@@ -284,6 +286,18 @@ export function RouteFormModal({
     setActivePicker(null);
     // Use route id, not the whole object — avoids re-running when the parent recreates route DTOs.
   }, [visible, editingRoute?.id]);
+
+  useEffect(() => {
+    if (!editingRoute) return;
+    if (pickedOption) return;
+    if (!transitOptions || transitOptions.length === 0) return;
+    const selectedId = editingRoute.transitSnapshot?.selectedOptionId;
+    if (!selectedId) return;
+    const match = transitOptions.find((o) => o.id === selectedId);
+    if (match) {
+      setPickedOption(match);
+    }
+  }, [transitOptions, editingRoute, pickedOption]);
 
   const departureInstant = useCallback((): Date => {
     if (Platform.OS === "web") {
@@ -565,7 +579,11 @@ export function RouteFormModal({
                 value={destination}
               />
 
-              <RouteEndpointsMap departure={depCoords} destination={destCoords} />
+              <RouteEndpointsMap
+                departure={depCoords}
+                destination={destCoords}
+                transitPayload={pickedOption?.payload ?? editingRoute?.transitSnapshot?.selectedPayload ?? null}
+              />
 
               {Platform.OS === "web" ? (
                 <>
