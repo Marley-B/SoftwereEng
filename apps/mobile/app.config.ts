@@ -12,6 +12,18 @@ const config: ExpoConfig = {
     "expo-localization",
     "expo-secure-store",
     "expo-notifications",
+    [
+      "expo-location",
+      {
+        isAndroidBackgroundLocationEnabled: true,
+        isAndroidForegroundServiceEnabled: true,
+        isIosBackgroundLocationEnabled: true,
+        locationAlwaysAndWhenInUsePermission:
+          "Allow Route Helper to use your location to detect recurring routes.",
+        locationWhenInUsePermission:
+          "Allow Route Helper to use your location while the app is open to detect recurring routes."
+      }
+    ],
   ],
   ios: {
     supportsTablet: true
