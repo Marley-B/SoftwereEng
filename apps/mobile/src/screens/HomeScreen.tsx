@@ -20,7 +20,7 @@ import { useDisruptionsContext } from '../features/disruptions/context/Disruptio
 import { RouteDetectionDemo } from '../features/routes/components/RouteDetectionDemo';
 import { RouteFormModal } from '../features/routes/components/RouteFormModal';
 import { RouteListItem } from '../features/routes/components/RouteListItem';
-import type { Route, RouteCreateBody } from '../features/routes/types';
+import type { DetectedRouteDraft, Route, RouteCreateBody } from '../features/routes/types';
 import { useRoutes } from '../features/routes/useRoutes';
 import { registerExpoPushAndUpload } from '../lib/pushRegistration';
 import { RouteDisruptionsScreen } from './RouteDisruptionsScreen';
@@ -63,12 +63,33 @@ function DropdownSection({ children, expanded, onToggle, subtitle, title }: Drop
   );
 }
 
+interface HomeContentProps {
+  children: React.ReactNode;
+}
+
+function HomeContent({ children }: HomeContentProps) {
+  if (Platform.OS === 'web') {
+    return <View style={styles.webPageContent}>{children}</View>;
+  }
+  return (
+    <ScrollView
+      contentContainerStyle={styles.pageContent}
+      nestedScrollEnabled
+      showsVerticalScrollIndicator
+      style={styles.pageScroll}
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
 export function HomeScreen() {
   const { signOut: _signOut, user } = useAuth();
   const { routes, isLoading, error, refetch, createRoute, updateRoute, deleteRoute } = useRoutes();
   const { disruptions } = useDisruptionsContext();
 
   const [formVisible, setFormVisible] = useState(false);
+  const [detectedDraft, setDetectedDraft] = useState<DetectedRouteDraft | null>(null);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [showDisruptions, setShowDisruptions] = useState(false);
   const [detectionExpanded, setDetectionExpanded] = useState(true);
@@ -90,17 +111,26 @@ export function HomeScreen() {
   }, [_signOut]);
 
   const openAddRoute = useCallback(() => {
+    setDetectedDraft(null);
     setEditingRoute(null);
     setFormVisible(true);
   }, []);
 
   const openEditRoute = useCallback((route: Route) => {
+    setDetectedDraft(null);
     setEditingRoute(route);
+    setFormVisible(true);
+  }, []);
+
+  const openDetectedDraft = useCallback((draft: DetectedRouteDraft) => {
+    setEditingRoute(null);
+    setDetectedDraft(draft);
     setFormVisible(true);
   }, []);
 
   const closeForm = useCallback(() => {
     setFormVisible(false);
+    setDetectedDraft(null);
     setEditingRoute(null);
   }, []);
 
@@ -164,6 +194,7 @@ export function HomeScreen() {
     <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.safe}>
       <View style={styles.column}>
         <RouteFormModal
+          detectedDraft={detectedDraft}
           editingRoute={editingRoute}
           onDismiss={closeForm}
           onSubmit={onSaveRoute}
@@ -183,7 +214,7 @@ export function HomeScreen() {
               </Pressable>
             </View>
           ) : (
-            <ScrollView contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator={false}>
+            <HomeContent>
               <View style={styles.topRow}>
                 <Pressable
                   accessibilityLabel='Sign out'
@@ -224,7 +255,7 @@ export function HomeScreen() {
                 subtitle='GPS samples and recurring route suggestions.'
                 title='Detected frequent routes'
               >
-                <RouteDetectionDemo />
+                <RouteDetectionDemo onSaveCandidate={openDetectedDraft} />
               </DropdownSection>
 
               <DropdownSection
@@ -241,7 +272,7 @@ export function HomeScreen() {
                   <AuthPrimaryButton label='Add route' onPress={openAddRoute} />
                 </View>
               ) : null}
-            </ScrollView>
+            </HomeContent>
           )}
         </View>
       </View>
@@ -310,10 +341,10 @@ const styles = StyleSheet.create({
   },
   inner: {
     alignSelf: 'center',
-    flex: 1,
     maxWidth: 480,
     paddingHorizontal: authTheme.space.lg,
     width: '100%',
+    ...(Platform.OS === 'web' ? { minHeight: '100vh' as never } : { flex: 1 }),
   },
   listEmptyFill: {
     alignItems: 'center',
@@ -326,7 +357,10 @@ const styles = StyleSheet.create({
   pageContent: {
     flexGrow: 1,
     gap: authTheme.space.sm,
-    paddingBottom: authTheme.space.xl,
+    paddingBottom: authTheme.space.xl * 3,
+  },
+  pageScroll: {
+    flex: 1,
   },
   retry: {
     alignItems: 'center',
@@ -346,7 +380,17 @@ const styles = StyleSheet.create({
   },
   safe: {
     backgroundColor: authTheme.colors.background,
-    flex: 1,
+    ...(Platform.OS === 'web' ? { minHeight: '100vh' as never } : { flex: 1 }),
+  },
+  webPageContent: {
+    gap: authTheme.space.sm,
+    paddingBottom: authTheme.space.xl * 4,
+    ...(Platform.OS === 'web'
+      ? {
+          minHeight: '100vh' as never,
+          overflow: 'visible' as never,
+        }
+      : {}),
   },
   section: {
     backgroundColor: authTheme.colors.surface,
