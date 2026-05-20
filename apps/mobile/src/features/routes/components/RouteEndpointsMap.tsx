@@ -2,12 +2,15 @@ import Constants from 'expo-constants';
 import { useMemo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
+import type { PlaceRef } from '@route-helper/shared';
 import { authTheme } from '../../auth/theme';
 
-export interface RouteEndpointCoordinate {
-  latitude: number;
-  longitude: number;
-}
+export type RouteEndpointCoordinate =
+  | {
+      latitude: number;
+      longitude: number;
+    }
+  | PlaceRef;
 
 interface RouteEndpointsMapProps {
   departure: RouteEndpointCoordinate | null;
@@ -61,16 +64,29 @@ function extractEncodedPolylines(payload: unknown): string[] {
 }
 
 /** Google Static Maps only (no Apple MapKit / native map views). */
+function normalizeEndpoint(endpoint: RouteEndpointCoordinate | null): { latitude: number; longitude: number } | null {
+  if (!endpoint) {
+    return null;
+  }
+  if ('latitude' in endpoint && 'longitude' in endpoint) {
+    return { latitude: endpoint.latitude, longitude: endpoint.longitude };
+  }
+  return { latitude: endpoint.lat, longitude: endpoint.lng };
+}
+
 function buildStaticMapUrl(
   departure: RouteEndpointCoordinate | null,
   destination: RouteEndpointCoordinate | null,
   apiKey: string,
   encodedPolylines: string[] = [],
 ): string | null {
+  const normalizedDeparture = normalizeEndpoint(departure);
+  const normalizedDestination = normalizeEndpoint(destination);
+
   if (!apiKey.trim()) {
     return null;
   }
-  if (!departure && !destination) {
+  if (!normalizedDeparture && !normalizedDestination) {
     return null;
   }
 
@@ -80,20 +96,26 @@ function buildStaticMapUrl(
   params.set('scale', '2');
   params.set('key', apiKey.trim());
 
-  if (departure) {
-    params.append('markers', `color:0x2563eb|size:mid|label:D|${departure.latitude},${departure.longitude}`);
+  if (normalizedDeparture) {
+    params.append(
+      'markers',
+      `color:0x2563eb|size:mid|label:D|${normalizedDeparture.latitude},${normalizedDeparture.longitude}`,
+    );
   }
-  if (destination) {
-    params.append('markers', `color:0xc026d3|size:mid|label:A|${destination.latitude},${destination.longitude}`);
+  if (normalizedDestination) {
+    params.append(
+      'markers',
+      `color:0xc026d3|size:mid|label:A|${normalizedDestination.latitude},${normalizedDestination.longitude}`,
+    );
   }
   if (encodedPolylines.length > 0) {
     for (const polyline of encodedPolylines) {
       params.append('path', `color:0x2563eb|weight:4|enc:${polyline}`);
     }
-  } else if (departure && destination) {
+  } else if (normalizedDeparture && normalizedDestination) {
     params.set(
       'path',
-      `color:0x64748b99|weight:3|${departure.latitude},${departure.longitude}|${destination.latitude},${destination.longitude}`,
+      `color:0x64748b99|weight:3|${normalizedDeparture.latitude},${normalizedDeparture.longitude}|${normalizedDestination.latitude},${normalizedDestination.longitude}`,
     );
   }
   return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
