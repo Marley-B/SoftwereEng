@@ -71,6 +71,7 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
 
       let ok = true;
       let summary = "ok";
+      let possibleDelay = false;
       try {
         const check = await evaluateTransitRouteCheck({
           apiKey: googleApiKey,
@@ -86,16 +87,31 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
         summary = check.summary;
         if (ok) {
           const durationSeconds = check.durationSeconds ?? snapshot.baselineDurationSeconds;
-          const arrival = isPredictedArrivalWithinSlack({
+          // Upper threshold: after this we consider a real disruption
+          const arrivalUpper = isPredictedArrivalWithinSlack({
             departureUtc: dep,
             durationSeconds,
             expectedArrivalHHmm: route.expectedArrival,
             timeZone: route.timezone,
-            slackMinutes: 5,
+            slackMinutes: 10,
           });
-          ok = arrival.ok;
-          if (!arrival.ok) {
-            summary = arrival.reason ?? "Arrival no longer within expected window";
+          if (!arrivalUpper.ok) {
+            ok = false;
+            summary = arrivalUpper.reason ?? "Arrival no longer within expected window (+10m)";
+          } else {
+            // Lower threshold for a "possible delay" (between 5 and 10 minutes)
+            const arrivalLower = isPredictedArrivalWithinSlack({
+              departureUtc: dep,
+              durationSeconds,
+              expectedArrivalHHmm: route.expectedArrival,
+              timeZone: route.timezone,
+              slackMinutes: 5,
+            });
+            if (!arrivalLower.ok) {
+              ok = false;
+              possibleDelay = true;
+              summary = arrivalLower.reason ?? "Predicted arrival is slightly later than expected (+5-10m)";
+            }
           }
         }
       } catch (e) {
@@ -119,7 +135,7 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
         userId: route.userId,
         routeId: route.id,
         description,
-        severity: "warn",
+        severity: possibleDelay ? "info" : "warn",
       });
 
       const tokens = await db
@@ -127,11 +143,12 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
         .from(pushTokens)
         .where(eq(pushTokens.userId, route.userId));
 
+      const title = possibleDelay ? "Possible route delay" : "Route disruption";
       for (const { token } of tokens) {
         try {
           await sendExpoPushNotification({
             to: token,
-            title: "Route disruption",
+            title,
             body: description,
             data: { routeId: route.id },
           });
