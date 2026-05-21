@@ -647,7 +647,8 @@ export function RouteFormModal({
                   />
                 </>
               )}
-              <View style={styles.weekdaysBlock}>
+              {!compact ? (
+                <View style={styles.weekdaysBlock}>
                   <Text style={styles.weekdaysLabel}>Days of week:</Text>
                   <View style={styles.weekdaysRow}>
                     {WEEKDAYS.map((day) => (
@@ -670,8 +671,9 @@ export function RouteFormModal({
                         <Text style={styles.weekdayText}>{day.slice(0, 3).toUpperCase()}</Text>
                       </Pressable>
                     ))}
+                  </View>
                 </View>
-              </View>
+              ) : null}
               <View style={styles.transitBlock}>
                 <View style={styles.transitHeaderRow}>
                   <Text style={styles.transitTitle}>Transit options: </Text>
