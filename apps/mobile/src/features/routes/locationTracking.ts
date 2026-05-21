@@ -2,15 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
-import type { LocationSample } from "@route-helper/shared";
+import type { LocationSample, LocationSamplesBody } from "@route-helper/shared";
+
+import { apiRequest } from "../../lib/apiClient";
 
 const ROUTE_DETECTION_LOCATION_TASK = "route-helper-location-samples";
 const MAX_IN_MEMORY_SAMPLES = 2_000;
+const MAX_UPLOAD_BATCH = 100;
+const UPLOAD_DEBOUNCE_MS = 10_000;
 
 type Listener = (samples: LocationSample[]) => void;
 
 const listeners = new Set<Listener>();
 let samples: LocationSample[] = [];
+let pendingUploadSamples: LocationSample[] = [];
+let uploadTimer: ReturnType<typeof setTimeout> | null = null;
+let isUploading = false;
 
 function publish() {
   const snapshot = [...samples];
@@ -21,7 +28,53 @@ function publish() {
 
 function appendSample(sample: LocationSample) {
   samples = [...samples, sample].slice(-MAX_IN_MEMORY_SAMPLES);
+  queueSampleUpload(sample);
   publish();
+}
+
+function queueSampleUpload(sample: LocationSample) {
+  pendingUploadSamples = [...pendingUploadSamples, sample].slice(-MAX_UPLOAD_BATCH * 5);
+  if (uploadTimer) {
+    return;
+  }
+  uploadTimer = setTimeout(() => {
+    uploadTimer = null;
+    void flushSampleUploads();
+  }, UPLOAD_DEBOUNCE_MS);
+}
+
+async function flushSampleUploads(): Promise<void> {
+  if (isUploading || pendingUploadSamples.length === 0) {
+    return;
+  }
+  isUploading = true;
+  const batch = pendingUploadSamples.slice(0, MAX_UPLOAD_BATCH);
+  try {
+    const body: LocationSamplesBody = {
+      samples: batch.map((sample) => ({
+        ...(sample.accuracyMeters !== undefined ? { accuracyMeters: sample.accuracyMeters } : {}),
+        lat: sample.lat,
+        lng: sample.lng,
+        recordedAt:
+          sample.recordedAt instanceof Date ? sample.recordedAt.toISOString() : sample.recordedAt,
+      })),
+    };
+    await apiRequest<{ inserted: number }>("/me/location-samples", {
+      method: "POST",
+      json: body,
+    });
+    pendingUploadSamples = pendingUploadSamples.slice(batch.length);
+  } catch {
+    // Keep samples in memory; the user can still run local analysis if upload fails.
+  } finally {
+    isUploading = false;
+    if (pendingUploadSamples.length > 0 && !uploadTimer) {
+      uploadTimer = setTimeout(() => {
+        uploadTimer = null;
+        void flushSampleUploads();
+      }, UPLOAD_DEBOUNCE_MS);
+    }
+  }
 }
 
 function sampleFromLocation(location: Location.LocationObject): LocationSample {
@@ -181,6 +234,7 @@ export function useRouteDetectionTracking(): UseRouteDetectionTrackingResult {
     foregroundSubscription.current?.remove();
     foregroundSubscription.current = null;
     setIsTracking(false);
+    await flushSampleUploads();
 
     if (Platform.OS !== "web") {
       const backgroundStarted = await Location.hasStartedLocationUpdatesAsync(ROUTE_DETECTION_LOCATION_TASK);

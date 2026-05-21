@@ -141,6 +141,19 @@ export const routeResponseSchema = z.object({
 
 export type RouteResponse = z.infer<typeof routeResponseSchema>;
 
+export const locationSampleSchema = z.object({
+  accuracyMeters: z.number().nonnegative().optional(),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  recordedAt: z.string().min(1)
+});
+
+export const locationSamplesBodySchema = z.object({
+  samples: z.array(locationSampleSchema).min(1).max(500)
+});
+
+export type LocationSamplesBody = z.infer<typeof locationSamplesBodySchema>;
+
 export const disruptionResponseSchema = z.object({
   id: z.string().uuid(),
   occurredAt: z.string(),

@@ -1,4 +1,5 @@
 import {
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -40,6 +41,25 @@ export const routes = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
   },
   (t) => [index("routes_user_id_idx").on(t.userId)]
+);
+
+/** Raw opt-in GPS samples used to infer recurring daily routes. */
+export const routeLocationSamples = pgTable(
+  "route_location_samples",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+    accuracyMeters: integer("accuracy_meters"),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (t) => [
+    index("route_location_samples_user_recorded_idx").on(t.userId, t.recordedAt)
+  ]
 );
 
 /** Expo push tokens per user (upsert). */

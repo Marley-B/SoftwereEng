@@ -7,9 +7,11 @@ import {
   detectRecurringRoutes,
   type DetectedRecurringRoute,
   type LocationSample,
+  type RouteDetectionResult,
 } from "@route-helper/shared";
 
 import { authTheme } from "../../auth/theme";
+import { ApiError, apiRequest } from "../../../lib/apiClient";
 import type { DetectedRouteDraft } from "../types";
 import { useRouteDetectionTracking } from "../locationTracking";
 import {
@@ -69,6 +71,23 @@ function coordinateKey(endpoint: { lat: number; lng: number }): string {
 
 function coordinateLabel(endpoint: { lat: number; lng: number }): string {
   return `${endpoint.lat.toFixed(5)}, ${endpoint.lng.toFixed(5)}`;
+}
+
+function sampleTimeLabel(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return date.toLocaleString([], {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+  });
+}
+
+function samplePlaceKey(sample: { lat: number; lng: number }): string {
+  return `${sample.lat.toFixed(5)},${sample.lng.toFixed(5)}`;
 }
 
 function demoEndpointLabel(endpoint: { lat: number; lng: number }): string | null {
@@ -188,6 +207,12 @@ interface RouteDetectionDemoProps {
 export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps) {
   const [hasRun, setHasRun] = useState(false);
   const [showDemoData, setShowDemoData] = useState(false);
+  const [serverAnalysis, setServerAnalysis] = useState<{
+    recentSamples?: LocationSample[];
+    result: RouteDetectionResult;
+    sampleCount: number;
+  } | null>(null);
+  const [serverAnalysisError, setServerAnalysisError] = useState<string | null>(null);
   const [expandedRoutes, setExpandedRoutes] = useState<Record<string, boolean>>({});
   const [endpointLabels, setEndpointLabels] = useState<Record<string, string>>({});
   const tracker = useRouteDetectionTracking();
@@ -197,15 +222,31 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
     () => detectRecurringRoutes(activeSamples, { timeZone: userTimeZone }),
     [activeSamples, userTimeZone],
   );
+  const analysisResult = serverAnalysis && !showDemoData ? serverAnalysis.result : result;
+  const analysisSampleCount = serverAnalysis && !showDemoData ? serverAnalysis.sampleCount : activeSamples.length;
+  const visibleSavedSamples = useMemo(() => {
+    if (!serverAnalysis || showDemoData) {
+      return [];
+    }
+    const seen = new Set<string>();
+    return (serverAnalysis.recentSamples ?? []).filter((sample) => {
+      const key = samplePlaceKey(sample);
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }, [serverAnalysis, showDemoData]);
   const canStop = tracker.isTracking || tracker.isBackgroundTracking;
 
   useEffect(() => {
-    if (!hasRun || result.recurringRoutes.length === 0) {
+    if (!hasRun || analysisResult.recurringRoutes.length === 0) {
       return;
     }
     let cancelled = false;
     void (async () => {
-      for (const route of result.recurringRoutes) {
+      for (const route of analysisResult.recurringRoutes) {
         const sent = await notifyPotentialRouteDetected(route);
         if (!sent && !cancelled) {
           Alert.alert("Potential frequent route found", routeNotificationMessage(route));
@@ -215,14 +256,14 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
     return () => {
       cancelled = true;
     };
-  }, [hasRun, result.recurringRoutes.map(routeNotificationKey).join(",")]);
+  }, [hasRun, analysisResult.recurringRoutes.map(routeNotificationKey).join(",")]);
 
   useEffect(() => {
-    if (!hasRun || result.recurringRoutes.length === 0) {
+    if (!hasRun || analysisResult.recurringRoutes.length === 0) {
       return;
     }
     let cancelled = false;
-    const endpoints = result.recurringRoutes.flatMap((route) => [route.origin, route.destination]);
+    const endpoints = analysisResult.recurringRoutes.flatMap((route) => [route.origin, route.destination]);
     const missing = endpoints.filter((endpoint) => endpointLabels[coordinateKey(endpoint)] === undefined);
     if (missing.length === 0) {
       return;
@@ -250,7 +291,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
     return () => {
       cancelled = true;
     };
-  }, [endpointLabels, hasRun, result.recurringRoutes]);
+  }, [analysisResult.recurringRoutes, endpointLabels, hasRun]);
 
   const toggleRoute = (route: DetectedRecurringRoute, index: number) => {
     const key = `${route.origin.id}-${route.destination.id}-${index}`;
@@ -277,6 +318,23 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
     onSaveCandidate(toDetectedDraft(route, index, labels));
   };
 
+  const analyzeSavedSamples = async () => {
+    setHasRun(true);
+    setShowDemoData(false);
+    setServerAnalysisError(null);
+    try {
+      const response = await apiRequest<{
+        recentSamples?: LocationSample[];
+        result: RouteDetectionResult;
+        sampleCount: number;
+      }>("/me/route-analysis", { method: "GET" });
+      setServerAnalysis(response);
+    } catch (e) {
+      const body = e instanceof ApiError ? (e.body as { error?: string }) : null;
+      setServerAnalysisError(body?.error ?? "Could not analyze saved GPS samples.");
+    }
+  };
+
   return (
     <View style={styles.panel}>
       <Text style={styles.description}>
@@ -288,6 +346,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
           accessibilityRole="button"
           onPress={() => {
             setShowDemoData(false);
+            setServerAnalysis(null);
             setHasRun(true);
             void tracker.startTracking();
           }}
@@ -301,6 +360,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
             accessibilityRole="button"
             onPress={() => {
               setShowDemoData(false);
+              setServerAnalysis(null);
               setHasRun(true);
               void tracker.startBackgroundTracking();
             }}
@@ -327,6 +387,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
           accessibilityRole="button"
           onPress={() => {
             setShowDemoData(true);
+            setServerAnalysis(null);
             setHasRun(true);
           }}
           style={({ pressed }) => [styles.secondaryAction, pressed && styles.secondaryActionPressed]}
@@ -336,8 +397,18 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          onPress={() => void analyzeSavedSamples()}
+          style={({ pressed }) => [styles.secondaryAction, pressed && styles.secondaryActionPressed]}
+        >
+          <Route color={authTheme.colors.primary} size={17} strokeWidth={2.4} />
+          <Text style={styles.secondaryActionLabel}>Analyze saved</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
           onPress={() => {
             setShowDemoData(false);
+            setServerAnalysis(null);
+            setServerAnalysisError(null);
             resetDetectedRouteNotificationMemory();
             tracker.clearSamples();
           }}
@@ -350,16 +421,30 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
       {hasRun ? (
         <View style={styles.result}>
           <Text style={styles.resultLine}>
-            Source: {showDemoData ? "sample data" : "GPS"}
+            Source: {showDemoData ? "sample data" : serverAnalysis ? "saved GPS" : "GPS"}
           </Text>
-          <Text style={styles.resultLine}>Samples: {activeSamples.length}</Text>
-          <Text style={styles.resultLine}>Stops found: {result.stops.length}</Text>
+          <Text style={styles.resultLine}>Samples: {analysisSampleCount}</Text>
+          <Text style={styles.resultLine}>Stops found: {analysisResult.stops.length}</Text>
           <Text style={styles.resultLine}>Permission: {tracker.permissionStatus ?? "unknown"}</Text>
+          {visibleSavedSamples.length > 0 ? (
+            <View style={styles.samplePreview}>
+              <Text style={styles.resultTitle}>Recent samples</Text>
+              {visibleSavedSamples.map((sample, index) => (
+                <Text
+                  key={`${sample.recordedAt}-${sample.lat}-${sample.lng}-${index}`}
+                  style={styles.sampleLine}
+                >
+                  {sampleTimeLabel(sample.recordedAt)} - {coordinateLabel(sample)}
+                </Text>
+              ))}
+            </View>
+          ) : null}
           {tracker.error ? <Text style={styles.errorLine}>{tracker.error}</Text> : null}
-          {result.recurringRoutes.length > 0 ? (
+          {serverAnalysisError ? <Text style={styles.errorLine}>{serverAnalysisError}</Text> : null}
+          {analysisResult.recurringRoutes.length > 0 ? (
             <>
               <Text style={styles.resultTitle}>Detected routes</Text>
-              {result.recurringRoutes.map((detectedRoute, index) => {
+              {analysisResult.recurringRoutes.map((detectedRoute, index) => {
                 const key = `${detectedRoute.origin.id}-${detectedRoute.destination.id}-${index}`;
                 return (
                   <DetectedRouteCard
@@ -375,7 +460,9 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
               })}
             </>
           ) : (
-            <Text style={styles.resultLine}>No recurring route found yet.</Text>
+            <Text style={styles.resultLine}>
+              No frequent route found yet. {analysisSampleCount} location points were analyzed. Keep tracking during a few regular journeys and check again later.
+            </Text>
           )}
         </View>
       ) : null}
@@ -444,6 +531,16 @@ const styles = StyleSheet.create({
     color: authTheme.colors.foreground,
     fontSize: authTheme.typography.caption,
     fontWeight: "600",
+  },
+  sampleLine: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  samplePreview: {
+    gap: 2,
+    paddingVertical: 2,
   },
   resultTitle: {
     color: authTheme.colors.foreground,
