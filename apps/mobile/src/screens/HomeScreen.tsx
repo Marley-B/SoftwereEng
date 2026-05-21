@@ -34,7 +34,7 @@ interface DropdownSectionProps {
   children: React.ReactNode;
   expanded: boolean;
   onToggle: () => void;
-  subtitle: string;
+  subtitle?: string;
   title: string;
 }
 
@@ -49,7 +49,7 @@ function DropdownSection({ children, expanded, onToggle, subtitle, title }: Drop
       >
         <View style={styles.sectionTitleBlock}>
           <Text style={styles.sectionTitle}>{title}</Text>
-          <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+          {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
         </View>
         <Text
           accessibilityElementsHidden
@@ -299,7 +299,6 @@ export function HomeScreen() {
               <DropdownSection
                 expanded={detectionExpanded}
                 onToggle={toggleDetection}
-                subtitle='GPS samples and recurring route suggestions.'
                 title='Detected frequent routes'
               >
                 <RouteDetectionDemo onSaveCandidate={openDetectedDraft} />
