@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -14,6 +16,11 @@ import { ArrowLeftFromLine } from 'lucide-react-native';
 import { authTheme } from '../features/auth/theme';
 import { DisruptionListItem } from '../features/disruptions/components/DisruptionListItem';
 import { useDisruptionsContext } from '../features/disruptions/context/DisruptionsProvider';
+import { RouteFormModal } from '../features/routes/components/RouteFormModal';
+import { useRoutes } from '../features/routes/useRoutes';
+import { apiRequest } from '../lib/apiClient';
+import type { Route } from '../features/routes/types';
+import type { RouteCreateBody } from '../features/routes/types';
 
 interface RouteDisruptionsScreenProps {
   onBack: () => void;
@@ -21,7 +28,11 @@ interface RouteDisruptionsScreenProps {
 
 export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) {
   const { disruptions, error, isLoading, refetch, dismiss } = useDisruptionsContext();
+  const { routes, refetch: refetchRoutes, updateRoute } = useRoutes();
   const [refreshing, setRefreshing] = useState(false);
+  const [editingRoute, setEditingRoute] = useState<Route | null>(null);
+  const [formVisible, setFormVisible] = useState(false);
+  const [formCompact, setFormCompact] = useState(false);
 
   // Worker writes to the API DB; reload when this screen opens so new items appear.
   useEffect(() => {
@@ -36,6 +47,57 @@ export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) 
       setRefreshing(false);
     }
   }, [refetch]);
+
+  const openRouteAlternatives = useCallback(
+    async (routeId: string | null, compact = false) => {
+      if (!routeId) {
+        return;
+      }
+
+      let route = routes.find((item) => item.id === routeId);
+      if (!route) {
+        await refetchRoutes();
+        try {
+          const data = await apiRequest<Route[]>('/routes', { method: 'GET' });
+          route = data.find((item) => item.id === routeId);
+        } catch (_e) {
+          // ignore; we will show an alert below if the route still isn't found
+        }
+      }
+
+      if (!route) {
+        if (Platform.OS === 'web' && typeof (globalThis as any).window !== 'undefined') {
+          (globalThis as any).window.alert('Saved routes are still loading. Please wait a moment and try again.');
+        } else {
+          Alert.alert(
+            'Route unavailable',
+            'Saved routes are still loading. Please wait a moment and try again.',
+          );
+        }
+        return;
+      }
+
+      setEditingRoute(route);
+      setFormCompact(compact);
+      setFormVisible(true);
+    },
+    [refetchRoutes, routes],
+  );
+
+  const closeForm = useCallback(() => {
+    setFormVisible(false);
+    setEditingRoute(null);
+  }, []);
+
+  const onSaveRoute = useCallback(
+    async (body: RouteCreateBody, editingId: string | null) => {
+      if (editingId) {
+        await updateRoute(editingId, body);
+      }
+      closeForm();
+    },
+    [closeForm, updateRoute],
+  );
 
   const renderListHeader = useCallback(
     () => (
@@ -80,6 +142,15 @@ export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) 
               </View>
             </>
           ) : (
+            <>
+            <RouteFormModal
+              detectedDraft={null}
+              editingRoute={editingRoute}
+              compact={formCompact}
+              onDismiss={closeForm}
+              onSubmit={onSaveRoute}
+              visible={formVisible}
+            />
             <FlatList
               contentContainerStyle={styles.listContent}
               data={isLoading ? [] : disruptions}
@@ -103,10 +174,17 @@ export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) 
                 )
               }
               ListHeaderComponent={renderListHeader}
-              renderItem={({ item }) => <DisruptionListItem disruption={item} onDismiss={dismiss} />}
+              renderItem={({ item }) => (
+                <DisruptionListItem
+                  disruption={item}
+                  onDismiss={dismiss}
+                  onViewAlternatives={openRouteAlternatives}
+                />
+              )}
               showsVerticalScrollIndicator={false}
               style={styles.listFlex}
             />
+          </>
           )}
         </View>
       </View>

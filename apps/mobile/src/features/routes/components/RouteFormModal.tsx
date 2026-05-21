@@ -48,6 +48,7 @@ const WEEKDAYS = [
 interface RouteFormModalProps {
   detectedDraft: DetectedRouteDraft | null;
   editingRoute: Route | null;
+  compact?: boolean;
   onDismiss: () => void;
   onSubmit: (body: RouteCreateBody, editingId: string | null) => Promise<void>;
   visible: boolean;
@@ -219,6 +220,7 @@ function TimeField({ label, onPress, value }: TimeFieldProps) {
 export function RouteFormModal({
   detectedDraft,
   editingRoute,
+  compact = false,
   onDismiss,
   onSubmit,
   visible,
@@ -543,11 +545,13 @@ export function RouteFormModal({
         <Pressable accessibilityRole="button" onPress={onDismiss} style={styles.backdrop} />
         <View style={styles.sheetOuter} pointerEvents="box-none">
           <View style={styles.sheet}>
-            <Pressable onPress={Keyboard.dismiss} style={styles.sheetTitleArea}>
-              <Text accessibilityRole="header" style={styles.sheetTitle}>
-                {title}
-              </Text>
-            </Pressable>
+            {!compact ? (
+              <Pressable onPress={Keyboard.dismiss} style={styles.sheetTitleArea}>
+                <Text accessibilityRole="header" style={styles.sheetTitle}>
+                  {title}
+                </Text>
+              </Pressable>
+            ) : null}
 
             <ScrollView
               contentContainerStyle={styles.scrollContent}
@@ -557,46 +561,56 @@ export function RouteFormModal({
               showsVerticalScrollIndicator
               style={styles.scrollFlex}
             >
-              <AuthTextField
-                autoCapitalize="words"
-                label="Route name"
-                onChangeText={setName}
-                placeholder="e.g. Morning shuttle"
-                value={name}
-              />
+              {!compact ? (
+                <>
+                  <AuthTextField
+                    autoCapitalize="words"
+                    label="Route name"
+                    onChangeText={setName}
+                    placeholder="e.g. Morning shuttle"
+                    value={name}
+                  />
 
-              <PlaceAutocompleteField
-                label="Departure"
-                onSelect={(label, coords, place) => {
-                  setDeparture(label);
-                  if (coords && place) {
-                    setDepPlace(place);
-                  } else {
-                    setDepPlace(null);
-                  }
-                }}
-                placeholder="Search addresses (Google Maps)"
-                value={departure}
-              />
-              <PlaceAutocompleteField
-                label="Destination"
-                onSelect={(label, coords, place) => {
-                  setDestination(label);
-                  if (coords && place) {
-                    setDestPlace(place);
-                  } else {
-                    setDestPlace(null);
-                  }
-                }}
-                placeholder="Search addresses (Google Maps)"
-                value={destination}
-              />
+                  <PlaceAutocompleteField
+                    label="Departure"
+                    onSelect={(label, coords, place) => {
+                      setDeparture(label);
+                      if (coords && place) {
+                        setDepPlace(place);
+                      } else {
+                        setDepPlace(null);
+                      }
+                    }}
+                    placeholder="Search addresses (Google Maps)"
+                    value={departure}
+                  />
+                  <PlaceAutocompleteField
+                    label="Destination"
+                    onSelect={(label, coords, place) => {
+                      setDestination(label);
+                      if (coords && place) {
+                        setDestPlace(place);
+                      } else {
+                        setDestPlace(null);
+                      }
+                    }}
+                    placeholder="Search addresses (Google Maps)"
+                    value={destination}
+                  />
 
-              <RouteEndpointsMap
-                departure={depCoords}
-                destination={destCoords}
-                transitPayload={pickedOption?.payload ?? editingRoute?.transitSnapshot?.selectedPayload ?? null}
-              />
+                  <RouteEndpointsMap
+                    departure={depCoords}
+                    destination={destCoords}
+                    transitPayload={pickedOption?.payload ?? editingRoute?.transitSnapshot?.selectedPayload ?? null}
+                  />
+                </>
+              ) : (
+                <RouteEndpointsMap
+                  departure={depCoords}
+                  destination={destCoords}
+                  transitPayload={pickedOption?.payload ?? editingRoute?.transitSnapshot?.selectedPayload ?? null}
+                />
+              )}
 
               {Platform.OS === "web" ? (
                 <>
@@ -633,7 +647,8 @@ export function RouteFormModal({
                   />
                 </>
               )}
-              <View style={styles.weekdaysBlock}>
+              {!compact ? (
+                <View style={styles.weekdaysBlock}>
                   <Text style={styles.weekdaysLabel}>Days of week:</Text>
                   <View style={styles.weekdaysRow}>
                     {WEEKDAYS.map((day) => (
@@ -656,8 +671,9 @@ export function RouteFormModal({
                         <Text style={styles.weekdayText}>{day.slice(0, 3).toUpperCase()}</Text>
                       </Pressable>
                     ))}
+                  </View>
                 </View>
-              </View>
+              ) : null}
               <View style={styles.transitBlock}>
                 <View style={styles.transitHeaderRow}>
                   <Text style={styles.transitTitle}>Transit options: </Text>
@@ -723,19 +739,27 @@ export function RouteFormModal({
               </View>
             </ScrollView>
 
-            <View style={styles.actions}>
-              <View style={styles.actionGrow}>
-                <AuthGhostButton label="Cancel" onPress={onDismiss} />
+            {!compact ? (
+              <View style={styles.actions}>
+                <View style={styles.actionGrow}>
+                  <AuthGhostButton label="Cancel" onPress={onDismiss} />
+                </View>
+                <View style={styles.actionGrow}>
+                  <AuthPrimaryButton
+                    disabled={Boolean(transitWindowViolationMessage)}
+                    label={editingRoute ? "Save" : "Add route"}
+                    loading={saveBusy}
+                    onPress={() => void handleSubmit()}
+                  />
+                </View>
               </View>
-              <View style={styles.actionGrow}>
-                <AuthPrimaryButton
-                  disabled={Boolean(transitWindowViolationMessage)}
-                  label={editingRoute ? "Save" : "Add route"}
-                  loading={saveBusy}
-                  onPress={() => void handleSubmit()}
-                />
+            ) : (
+              <View style={styles.actions}>
+                <View style={styles.actionGrow}>
+                  <AuthPrimaryButton label="Close" onPress={onDismiss} />
+                </View>
               </View>
-            </View>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>

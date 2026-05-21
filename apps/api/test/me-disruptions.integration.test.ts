@@ -5,10 +5,10 @@ import "dotenv/config";
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import type { Database } from "@route-helper/db";
-import { disruptions, users } from "@route-helper/db";
+import { disruptions, routes, users } from "@route-helper/db";
 import type { FastifyInstance } from "fastify";
 
-import { createIntegrationApp, describeIntegration, jwtSecret } from "./helpers.js";
+import { createIntegrationApp, describeIntegration, jwtSecret, minimalRouteCreateBody } from "./helpers.js";
 import { signAccessToken } from "../src/lib/jwtTokens.js";
 import { hashPassword } from "../src/lib/scryptPassword.js";
 
@@ -16,6 +16,7 @@ describeIntegration("GET /me/disruptions (integration)", () => {
   let app: FastifyInstance;
   let db: Database;
   let userId: string;
+  let routeId: string;
   let disruptionId: string;
   const marker = `integration-disruption-${Date.now()}`;
 
@@ -38,11 +39,33 @@ describeIntegration("GET /me/disruptions (integration)", () => {
     }
     userId = u.id;
 
+    const routeBody = minimalRouteCreateBody("Disruption test route", `${marker}-route`);
+    const [r] = await db
+      .insert(routes)
+      .values({
+        userId,
+        name: routeBody.name,
+        startTime: routeBody.startTime,
+        expectedArrival: routeBody.expectedArrival,
+        timezone: routeBody.timeZone,
+        departureLabel: routeBody.departureLabel,
+        destinationLabel: routeBody.destinationLabel,
+        origin: routeBody.origin,
+        destination: routeBody.destination,
+        transitSnapshot: routeBody.transitSnapshot,
+        daysOfWeek: routeBody.daysOfWeek,
+      })
+      .returning({ id: routes.id });
+    if (!r) {
+      throw new Error("Failed to insert test route");
+    }
+    routeId = r.id;
+
     const [d] = await db
       .insert(disruptions)
       .values({
         userId,
-        routeId: null,
+        routeId,
         description: `Route “Test line”: ${marker}`,
         severity: "warn",
       })
@@ -76,6 +99,7 @@ describeIntegration("GET /me/disruptions (integration)", () => {
       description: string;
       occurredAt: string;
       affectedRoutes: string[];
+      routeId: string | null;
     }>;
     expect(Array.isArray(body)).toBe(true);
     const found = body.find((row) => row.id === disruptionId);
@@ -83,5 +107,7 @@ describeIntegration("GET /me/disruptions (integration)", () => {
     expect(found?.description).toContain(marker);
     expect(typeof found?.occurredAt).toBe("string");
     expect(Array.isArray(found?.affectedRoutes)).toBe(true);
+    expect(found?.routeId).toBe(routeId);
+    expect(found?.affectedRoutes).toEqual(["Disruption test route"]);
   });
 });

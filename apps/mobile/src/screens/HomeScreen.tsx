@@ -185,30 +185,6 @@ export function HomeScreen() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setRoutesExpanded((value) => !value);
   }, []);
-        <View style={styles.titleBlock}>
-          <Text accessibilityRole='header' style={styles.title}>
-            Your routes
-          </Text>
-          <Text style={styles.subtitle}>Tap a route to see details and actions.</Text>
-          <View style={styles.testRow}>
-            <Pressable
-              accessibilityRole='button'
-              disabled={testBusy}
-              onPress={() => void createTestDisruption('info')}
-              style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
-            >
-              <Text style={styles.testLabel}>Test delay</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole='button'
-              disabled={testBusy}
-              onPress={() => void createTestDisruption('warn')}
-              style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
-            >
-              <Text style={styles.testLabel}>Test disruption</Text>
-            </Pressable>
-          </View>
-        </View>
 
   const renderSavedRoutes = () => {
     if (isLoading) {
@@ -278,6 +254,24 @@ export function HomeScreen() {
                     Your routes
                   </Text>
                   <Text style={styles.subtitle}>Manage automatic detection and saved commutes.</Text>
+                  <View style={styles.testRow}>
+                    <Pressable
+                      accessibilityRole='button'
+                      disabled={testBusy}
+                      onPress={() => void createTestDisruption('info')}
+                      style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
+                    >
+                      <Text style={styles.testLabel}>Test delay</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole='button'
+                      disabled={testBusy}
+                      onPress={() => void createTestDisruption('warn')}
+                      style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
+                    >
+                      <Text style={styles.testLabel}>Test disruption</Text>
+                    </Pressable>
+                  </View>
                 </View>
 
                 <Pressable
