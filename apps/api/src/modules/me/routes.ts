@@ -92,4 +92,56 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
       });
     return { ok: true };
   });
+
+  // Test-only: create a fake disruption for the authenticated user.
+  // Useful for manual testing of mobile UX without waiting for the worker.
+  app.post("/disruptions/test", { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.auth?.userId;
+    if (!userId) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const body = request.body as { severity?: string; description?: string; routeId?: string } | undefined;
+    const severity = body?.severity === "info" ? "info" : "warn";
+    const description = body?.description ?? (severity === "info" ? "Possible delay (test)" : "Route disruption (test)");
+
+    let route: { id: string; name: string } | undefined;
+    if (body?.routeId) {
+      const [found] = await app.db
+        .select({ id: routes.id, name: routes.name })
+        .from(routes)
+        .where(and(eq(routes.userId, userId), eq(routes.id, body.routeId)))
+        .limit(1);
+      route = found;
+    } else {
+      const [found] = await app.db
+        .select({ id: routes.id, name: routes.name })
+        .from(routes)
+        .where(eq(routes.userId, userId))
+        .orderBy(desc(routes.createdAt))
+        .limit(1);
+      route = found;
+    }
+
+    if (!route) {
+      return reply.status(404).send({ error: "No route found for this user" });
+    }
+
+    const [row] = await app.db
+      .insert(disruptions)
+      .values({ userId, routeId: route.id, description, severity })
+      .returning();
+
+    if (!row) {
+      return reply.status(500).send({ error: "Failed to create test disruption" });
+    }
+
+    return disruptionResponseSchema.parse({
+      id: row.id,
+      occurredAt: occurredAtToIso(row.occurredAt),
+      description: row.description,
+      severity: row.severity,
+      routeId: row.routeId,
+      affectedRoutes: [route.name],
+    });
+  });
 };
