@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   dismissBtnPressed: {
     opacity: 0.7,
   },
-  actionRow: {
+  actionsRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: authTheme.space.sm,
