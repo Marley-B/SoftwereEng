@@ -22,6 +22,18 @@ export interface Route {
 
 export type { RouteCreateBody, RouteUpdateBody };
 
+export interface DetectedRouteDraft {
+  daysOfWeek: RouteCreateBody["daysOfWeek"];
+  departureLabel: string;
+  destination: PlaceRef;
+  destinationLabel: string;
+  expectedArrival: string;
+  id: string;
+  name: string;
+  origin: PlaceRef;
+  startTime: string;
+}
+
 /** @deprecated Legacy mock shape — prefer RouteCreateBody in new flows. */
 export interface RouteDraft {
   departure: string;

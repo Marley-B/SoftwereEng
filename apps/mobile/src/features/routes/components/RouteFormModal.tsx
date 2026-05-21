@@ -24,7 +24,7 @@ import { AuthTextField } from "../../auth/components/AuthTextField";
 import { authTheme } from "../../auth/theme";
 import { ApiError, apiRequest } from "../../../lib/apiClient";
 import type { Route } from "../types";
-import type { RouteCreateBody } from "../types";
+import type { DetectedRouteDraft, RouteCreateBody } from "../types";
 import { PlaceAutocompleteField } from "./PlaceAutocompleteField";
 import { RouteEndpointsMap } from "./RouteEndpointsMap";
 import {
@@ -46,6 +46,7 @@ const WEEKDAYS = [
 ];
 
 interface RouteFormModalProps {
+  detectedDraft: DetectedRouteDraft | null;
   editingRoute: Route | null;
   onDismiss: () => void;
   onSubmit: (body: RouteCreateBody, editingId: string | null) => Promise<void>;
@@ -216,6 +217,7 @@ function TimeField({ label, onPress, value }: TimeFieldProps) {
 // ─── Main form modal ──────────────────────────────────────────────────────────
 
 export function RouteFormModal({
+  detectedDraft,
   editingRoute,
   onDismiss,
   onSubmit,
@@ -268,6 +270,17 @@ export function RouteFormModal({
       setWebStart(editingRoute.startTime);
       setWebArrival(editingRoute.expectedArrival);
       setDaysOfWeek(editingRoute.daysOfWeek ?? [...WEEKDAYS]);
+    } else if (detectedDraft) {
+      setName(detectedDraft.name);
+      setDeparture(detectedDraft.departureLabel);
+      setDestination(detectedDraft.destinationLabel);
+      setDepPlace(detectedDraft.origin);
+      setDestPlace(detectedDraft.destination);
+      setStartDate(parseRouteTime(detectedDraft.startTime, morning));
+      setArrivalDate(parseRouteTime(detectedDraft.expectedArrival, ten));
+      setWebStart(detectedDraft.startTime);
+      setWebArrival(detectedDraft.expectedArrival);
+      setDaysOfWeek(detectedDraft.daysOfWeek);
     } else {
       setName("");
       setDeparture("");
@@ -285,7 +298,7 @@ export function RouteFormModal({
     setTransitError(null);
     setActivePicker(null);
     // Use route id, not the whole object — avoids re-running when the parent recreates route DTOs.
-  }, [visible, editingRoute?.id]);
+  }, [visible, editingRoute?.id, detectedDraft?.id]);
 
   useEffect(() => {
     if (!editingRoute) return;

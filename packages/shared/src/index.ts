@@ -165,3 +165,15 @@ export {
   isPredictedArrivalWithinSlack,
   localDateStringInZone
 } from "./arrival";
+
+export {
+  DEFAULT_ROUTE_DETECTION_OPTIONS,
+  detectRecurringRoutes,
+  distanceMeters,
+  type DetectedRecurringRoute,
+  type DetectedStop,
+  type LocationSample,
+  type RecurringEndpoint,
+  type RouteDetectionOptions,
+  type RouteDetectionResult
+} from "./routeDetection/index";
