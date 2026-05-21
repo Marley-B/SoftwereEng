@@ -36,6 +36,7 @@ function mapDto(d: DisruptionDto): Disruption {
     id: d.id,
     occurredAt: d.occurredAt,
     description: d.description,
+    routeId: d.routeId,
     affectedRoutes: d.affectedRoutes,
   };
 }
