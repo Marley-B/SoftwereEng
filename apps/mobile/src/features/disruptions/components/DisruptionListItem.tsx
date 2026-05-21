@@ -6,7 +6,7 @@ import type { Disruption } from '../types';
 interface DisruptionListItemProps {
   disruption: Disruption;
   onDismiss: (id: string) => void | Promise<void>;
-  onViewAlternatives?: (routeId: string | null) => void | Promise<void>;
+  onViewAlternatives?: (routeId: string | null, compact?: boolean) => void | Promise<void>;
 }
 
 function formatOccurredAt(iso: string): string {
@@ -39,16 +39,16 @@ export function DisruptionListItem({ disruption, onDismiss, onViewAlternatives }
 
       <View style={styles.actionsRow}>
         {disruption.routeId ? (
-          <Pressable
-            accessibilityLabel='View alternative routes'
-            accessibilityRole='button'
-            hitSlop={8}
-            onPress={() => void onViewAlternatives?.(disruption.routeId)}
-            style={({ pressed }) => [styles.altBtn, pressed && styles.altBtnPressed]}
-          >
-            <Text style={styles.altLabel}>View alternatives</Text>
-          </Pressable>
-        ) : null}
+            <Pressable
+              accessibilityLabel='View alternative routes'
+              accessibilityRole='button'
+              hitSlop={8}
+              onPress={() => void onViewAlternatives?.(disruption.routeId, true)}
+              style={({ pressed }) => [styles.altBtn, pressed && styles.altBtnPressed]}
+            >
+              <Text style={styles.altLabel}>View alternatives</Text>
+            </Pressable>
+          ) : null}
 
         <Pressable
           accessibilityLabel='Dismiss disruption'

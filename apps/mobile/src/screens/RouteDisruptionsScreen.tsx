@@ -32,6 +32,7 @@ export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) 
   const [refreshing, setRefreshing] = useState(false);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [formVisible, setFormVisible] = useState(false);
+  const [formCompact, setFormCompact] = useState(false);
 
   // Worker writes to the API DB; reload when this screen opens so new items appear.
   useEffect(() => {
@@ -48,7 +49,7 @@ export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) 
   }, [refetch]);
 
   const openRouteAlternatives = useCallback(
-    async (routeId: string | null) => {
+    async (routeId: string | null, compact = false) => {
       if (!routeId) {
         return;
       }
@@ -77,6 +78,7 @@ export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) 
       }
 
       setEditingRoute(route);
+      setFormCompact(compact);
       setFormVisible(true);
     },
     [refetchRoutes, routes],
@@ -144,6 +146,7 @@ export function RouteDisruptionsScreen({ onBack }: RouteDisruptionsScreenProps) 
             <RouteFormModal
               detectedDraft={null}
               editingRoute={editingRoute}
+              compact={formCompact}
               onDismiss={closeForm}
               onSubmit={onSaveRoute}
               visible={formVisible}
