@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -87,7 +87,7 @@ function HomeContent({ children }: HomeContentProps) {
 export function HomeScreen() {
   const { signOut: _signOut, user } = useAuth();
   const { routes, isLoading, error, refetch, createRoute, updateRoute, deleteRoute } = useRoutes();
-  const { disruptions } = useDisruptionsContext();
+  const { disruptions, refetch: refetchDisruptions } = useDisruptionsContext();
   const [testBusy, setTestBusy] = useState(false);
 
   const [formVisible, setFormVisible] = useState(false);
@@ -96,6 +96,7 @@ export function HomeScreen() {
   const [showDisruptions, setShowDisruptions] = useState(false);
   const [detectionExpanded, setDetectionExpanded] = useState(true);
   const [routesExpanded, setRoutesExpanded] = useState(true);
+  const wasShowingDisruptions = useRef(false);
 
   const disruptionCount = disruptions.length;
 
@@ -107,6 +108,19 @@ export function HomeScreen() {
       /* optional - user may deny permission */
     });
   }, [user]);
+
+  // Sync badge after leaving the disruptions screen (dismissals, pull-to-refresh).
+  useEffect(() => {
+    if (showDisruptions) {
+      wasShowingDisruptions.current = true;
+      return;
+    }
+    if (!user || !wasShowingDisruptions.current) {
+      return;
+    }
+    wasShowingDisruptions.current = false;
+    void refetchDisruptions({ background: true });
+  }, [user, showDisruptions, refetchDisruptions]);
 
   const handleSignOut = useCallback(async () => {
     await _signOut();
@@ -131,13 +145,13 @@ export function HomeScreen() {
           description: severity === 'info' ? 'Test possible delay' : 'Test disruption',
         },
       });
-      await refetch();
+      await refetchDisruptions({ background: true });
     } catch (e) {
       // ignore — user can still see disruption list if the request failed
     } finally {
       setTestBusy(false);
     }
-  }, [refetch, testBusy]);
+  }, [refetchDisruptions, testBusy]);
 
   const openEditRoute = useCallback((route: Route) => {
     setDetectedDraft(null);

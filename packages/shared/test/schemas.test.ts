@@ -50,4 +50,66 @@ describe("shared zod schemas", () => {
     };
     expect(routeCreateBodySchema.safeParse(body).success).toBe(true);
   });
+
+  test("routeCreateBodySchema rejects empty daysOfWeek", () => {
+    const body = {
+      name: "Commute",
+      startTime: "8:00",
+      expectedArrival: "9:00",
+      timeZone: "Europe/Berlin",
+      departureLabel: "A",
+      destinationLabel: "B",
+      daysOfWeek: [],
+      origin: {
+        address: "Addr 1",
+        lat: 1,
+        lng: 2,
+        placeId: "ChIJxxxxxxxxxxxxxxxxxxxxxx",
+      },
+      destination: {
+        address: "Addr 2",
+        lat: 1.1,
+        lng: 2.1,
+        placeId: "ChIJyyyyyyyyyyyyyyyyyyyyyy",
+      },
+      transitSnapshot: {
+        optionsRequest: { departureIso: "2026-01-01T08:00:00.000Z", timeZone: "Europe/Berlin" },
+        selectedOptionId: "opt1",
+        selectedPayload: {},
+        baselineDurationSeconds: 1800,
+      },
+    };
+    expect(routeCreateBodySchema.safeParse(body).success).toBe(false);
+  });
+
+  test("routeCreateBodySchema rejects invalid weekday names", () => {
+    const body = {
+      name: "Commute",
+      startTime: "8:00",
+      expectedArrival: "9:00",
+      timeZone: "Europe/Berlin",
+      departureLabel: "A",
+      destinationLabel: "B",
+      daysOfWeek: ["funday"],
+      origin: {
+        address: "Addr 1",
+        lat: 1,
+        lng: 2,
+        placeId: "ChIJxxxxxxxxxxxxxxxxxxxxxx",
+      },
+      destination: {
+        address: "Addr 2",
+        lat: 1.1,
+        lng: 2.1,
+        placeId: "ChIJyyyyyyyyyyyyyyyyyyyyyy",
+      },
+      transitSnapshot: {
+        optionsRequest: { departureIso: "2026-01-01T08:00:00.000Z", timeZone: "Europe/Berlin" },
+        selectedOptionId: "opt1",
+        selectedPayload: {},
+        baselineDurationSeconds: 1800,
+      },
+    };
+    expect(routeCreateBodySchema.safeParse(body).success).toBe(false);
+  });
 });

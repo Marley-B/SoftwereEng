@@ -1,5 +1,11 @@
-import "dotenv/config";
+import { config } from "dotenv";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Database } from "@route-helper/db";
+
+const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
+config({ path: resolve(repoRoot, "packages/db/.env") });
+config();
 import { createDb, runMigrations } from "@route-helper/db";
 import type { FastifyInstance } from "fastify";
 import { describe } from "bun:test";
@@ -7,9 +13,9 @@ import { describe } from "bun:test";
 import { buildApp, type BuildAppOptions } from "../src/app.js";
 import type { GoogleApiQuotaConfig } from "../src/lib/googleApiQuota.js";
 
-export const hasDatabase = Boolean(process.env.DATABASE_URL);
+const hasDatabase = Boolean(process.env.DATABASE_URL);
 export const jwtSecret = process.env.JWT_SECRET ?? "integration-test-jwt-secret";
-export const googleRoutesApiKey =
+const googleRoutesApiKey =
   process.env.GOOGLE_ROUTES_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? "test-google-key-placeholder";
 
 /** Skip entire describe blocks when Postgres is not configured (e.g. CI without DATABASE_URL). */
@@ -33,7 +39,7 @@ export const tightGoogleApiQuotaConfig: GoogleApiQuotaConfig = {
   placesSessionTtlMs: 60_000,
 };
 
-export function minimalPlaceRef(suffix: string) {
+function minimalPlaceRef(suffix: string) {
   return {
     address: `Integration test ${suffix}`,
     lat: 40.7128,
@@ -42,7 +48,7 @@ export function minimalPlaceRef(suffix: string) {
   };
 }
 
-export function minimalTransitSnapshot() {
+function minimalTransitSnapshot() {
   return {
     optionsRequest: {
       departureIso: "2026-06-01T12:00:00.000Z",

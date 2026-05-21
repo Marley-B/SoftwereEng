@@ -1,7 +1,6 @@
 /**
  * Verifies persisted disruptions (same shape as worker inserts) are returned from GET /me/disruptions.
  */
-import "dotenv/config";
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import type { Database } from "@route-helper/db";

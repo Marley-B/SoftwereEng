@@ -5,7 +5,7 @@ export interface LocationSample {
   recordedAt: Date | string;
 }
 
-export interface RouteDetectionOptions {
+interface RouteDetectionOptions {
   endpointClusterRadiusMeters: number;
   maxAccuracyMeters: number;
   maxSampleGapMs: number;
@@ -17,7 +17,7 @@ export interface RouteDetectionOptions {
   timeZone: string;
 }
 
-export interface DetectedStop {
+interface DetectedStop {
   durationMs: number;
   endedAt: string;
   id: string;
@@ -27,7 +27,7 @@ export interface DetectedStop {
   startedAt: string;
 }
 
-export interface RecurringEndpoint {
+interface RecurringEndpoint {
   daysOfWeek: WeekdayName[];
   firstSeenAt: string;
   id: string;
@@ -47,7 +47,7 @@ export interface DetectedRecurringRoute {
   typicalDepartureTime: string;
 }
 
-export interface RouteDetectionResult {
+interface RouteDetectionResult {
   recurringRoutes: DetectedRecurringRoute[];
   recurringEndpoints: RecurringEndpoint[];
   stops: DetectedStop[];

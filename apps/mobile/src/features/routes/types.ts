@@ -33,12 +33,3 @@ export interface DetectedRouteDraft {
   origin: PlaceRef;
   startTime: string;
 }
-
-/** @deprecated Legacy mock shape — prefer RouteCreateBody in new flows. */
-export interface RouteDraft {
-  departure: string;
-  destination: string;
-  expectedArrival: string;
-  name: string;
-  startTime: string;
-}

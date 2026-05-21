@@ -14,10 +14,6 @@ export const placeRefSchema = z.object({
   placeId: z.string().min(1)
 });
 
-export const commuteModeSchema = z.enum(["driving", "transit", "walking", "bicycling"]);
-
-export const checkStatusSchema = z.enum(["ok", "warn", "fail"]);
-
 /** One leg segment in a transit alternative (walk vs transit vehicle). */
 export const transitSegmentSchema = z.object({
   kind: z.enum(["walk", "transit"]),
@@ -25,8 +21,6 @@ export const transitSegmentSchema = z.object({
   line: z.string().min(1),
   detail: z.string().optional()
 });
-
-export type TransitSegment = z.infer<typeof transitSegmentSchema>;
 
 /** One selectable alternative from Google Routes (TRANSIT). */
 export const transitOptionSchema = z.object({
@@ -78,9 +72,6 @@ export const authResponseSchema = z.object({
   token: z.string().min(1),
   user: authUserDtoSchema
 });
-
-export type AuthUserDto = z.infer<typeof authUserDtoSchema>;
-export type AuthResponse = z.infer<typeof authResponseSchema>;
 
 export const transitOptionsBodySchema = z.object({
   origin: placeRefSchema,
@@ -171,9 +162,5 @@ export {
   detectRecurringRoutes,
   distanceMeters,
   type DetectedRecurringRoute,
-  type DetectedStop,
-  type LocationSample,
-  type RecurringEndpoint,
-  type RouteDetectionOptions,
-  type RouteDetectionResult
+  type LocationSample
 } from "./routeDetection/index";
