@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import {
   AuthFooterLink,
+  AuthGhostButton,
   AuthPrimaryButton,
 } from "../components/AuthButtons";
 import { AuthScreenLayout } from "../components/AuthScreenLayout";
@@ -45,6 +46,10 @@ export function SignUpScreen({ onBack, onHaveAccount }: SignUpScreenProps) {
 
   return (
     <AuthScreenLayout bottomInset={authTheme.space.lg}>
+      <View style={styles.topBar}>
+        <AuthGhostButton disabled={isBusy} label="← Back" onPress={onBack} />
+      </View>
+
       <View style={{flex: 1}}>
         <Text accessibilityRole="header" style={styles.title}>
           Create account

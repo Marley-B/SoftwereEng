@@ -52,7 +52,7 @@ if (Platform.OS !== "web") {
   }
 }
 
-export function subscribeRouteDetectionSamples(listener: Listener): () => void {
+function subscribeRouteDetectionSamples(listener: Listener): () => void {
   listeners.add(listener);
   listener([...samples]);
   return () => {
@@ -60,7 +60,7 @@ export function subscribeRouteDetectionSamples(listener: Listener): () => void {
   };
 }
 
-export function clearRouteDetectionSamples(): void {
+function clearRouteDetectionSamples(): void {
   samples = [];
   publish();
 }

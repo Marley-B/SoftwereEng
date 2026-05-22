@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import type { FastifyInstance } from "fastify";
 
