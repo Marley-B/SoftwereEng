@@ -13,4 +13,21 @@ if (!googleApiKey) {
 
 await runMigrations(databaseUrl);
 const db = createDb(databaseUrl);
-startScheduler({ db, googleApiKey });
+const scheduler = startScheduler({ db, googleApiKey });
+
+const shutdown = async (signal: NodeJS.Signals): Promise<never> => {
+  console.log(`[worker] received ${signal}, stopping scheduler`);
+  scheduler.stop();
+  process.exit(0);
+};
+
+process.once("SIGINT", () => {
+  void shutdown("SIGINT");
+});
+process.once("SIGTERM", () => {
+  void shutdown("SIGTERM");
+});
+
+await new Promise<void>(() => {
+  /* keep the worker alive until interrupted */
+});

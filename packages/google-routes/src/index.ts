@@ -7,6 +7,9 @@ const COMPUTE_ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeR
 interface GoogleRoute {
   duration?: string;
   staticDuration?: string;
+  polyline?: {
+    encodedPolyline?: string;
+  };
   localizedValues?: {
     duration?: { text?: string };
     staticDuration?: { text?: string };
@@ -70,6 +73,8 @@ export const computeTransitRouteOptions = async (
       location: { latLng: { latitude: params.destination.lat, longitude: params.destination.lng } }
     },
     travelMode: "TRANSIT",
+    polylineQuality: "HIGH_QUALITY",
+    polylineEncoding: "ENCODED_POLYLINE",
     departureTime: params.departureTimeRfc3339,
     computeAlternativeRoutes: params.computeAlternativeRoutes ?? true,
     languageCode: "en",
@@ -83,7 +88,7 @@ export const computeTransitRouteOptions = async (
       "X-Goog-Api-Key": params.apiKey,
       // Include full steps so we can read travelMode, transitDetails (line, vehicle, stops), and walk instructions.
       "X-Goog-FieldMask":
-        "routes.duration,routes.staticDuration,routes.localizedValues,routes.legs.steps.travelMode,routes.legs.steps.staticDuration,routes.legs.steps.navigationInstruction,routes.legs.steps.localizedValues,routes.legs.steps.transitDetails,routes.legs.steps.polyline"
+        "routes.duration,routes.staticDuration,routes.localizedValues,routes.polyline.encodedPolyline,routes.legs.steps.travelMode,routes.legs.steps.staticDuration,routes.legs.steps.navigationInstruction,routes.legs.steps.localizedValues,routes.legs.steps.transitDetails,routes.legs.steps.polyline"
     },
     body: JSON.stringify(body)
   });
@@ -110,6 +115,7 @@ export const computeTransitRouteOptions = async (
         index,
         duration: route.duration,
         staticDuration: route.staticDuration,
+        polyline: route.polyline,
         legs: route.legs
       }
     } satisfies ParsedTransitOption;

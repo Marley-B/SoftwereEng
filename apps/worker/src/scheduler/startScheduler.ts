@@ -8,8 +8,8 @@ export interface SchedulerOptions {
 }
 
 /** Every minute: pre-departure checks at T-60 / T-30 / T-5. */
-export const startScheduler = (opts: SchedulerOptions): void => {
-  cron.schedule(
+export const startScheduler = (opts: SchedulerOptions): cron.ScheduledTask => {
+  const task = cron.schedule(
     "* * * * *",
     () => {
       void runDueRouteChecks({ db: opts.db, googleApiKey: opts.googleApiKey }).catch((err) => {
@@ -19,4 +19,5 @@ export const startScheduler = (opts: SchedulerOptions): void => {
     { timezone: "UTC" },
   );
   console.log("[worker] scheduler started (every minute UTC)");
+  return task;
 };
