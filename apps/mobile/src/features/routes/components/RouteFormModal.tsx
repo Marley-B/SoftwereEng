@@ -253,6 +253,7 @@ export function RouteFormModal({
 
   const depCoords = depPlace ? { latitude: depPlace.lat, longitude: depPlace.lng } : null;
   const destCoords = destPlace ? { latitude: destPlace.lat, longitude: destPlace.lng } : null;
+  const selectedTransitPayload = pickedOption?.payload ?? editingRoute?.transitSnapshot?.selectedPayload ?? null;
 
   useEffect(() => {
     if (!visible) return;
@@ -598,18 +599,9 @@ export function RouteFormModal({
                     value={destination}
                   />
 
-                  <RouteEndpointsMap
-                    departure={depCoords}
-                    destination={destCoords}
-                    transitPayload={pickedOption?.payload ?? editingRoute?.transitSnapshot?.selectedPayload ?? null}
-                  />
                 </>
               ) : (
-                <RouteEndpointsMap
-                  departure={depCoords}
-                  destination={destCoords}
-                  transitPayload={pickedOption?.payload ?? editingRoute?.transitSnapshot?.selectedPayload ?? null}
-                />
+                null
               )}
 
               {Platform.OS === "web" ? (
@@ -674,6 +666,14 @@ export function RouteFormModal({
                   </View>
                 </View>
               ) : null}
+              <View style={styles.selectedMapBlock}>
+                <Text style={styles.selectedMapLabel}>Selected route preview</Text>
+                <RouteEndpointsMap
+                  departure={depCoords}
+                  destination={destCoords}
+                  transitPayload={selectedTransitPayload}
+                />
+              </View>
               <View style={styles.transitBlock}>
                 <View style={styles.transitHeaderRow}>
                   <Text style={styles.transitTitle}>Transit options: </Text>
@@ -822,6 +822,15 @@ const styles = StyleSheet.create({
   },
   scrollFlex: {
     flex: 1,
+  },
+  selectedMapBlock: {
+    gap: authTheme.space.xs,
+    marginTop: authTheme.space.sm,
+  },
+  selectedMapLabel: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.label,
+    fontWeight: "700",
   },
   sheet: {
     backgroundColor: authTheme.colors.surface,
