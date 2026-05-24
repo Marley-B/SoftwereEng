@@ -167,6 +167,7 @@ export function HomeScreen() {
   const [showDisruptions, setShowDisruptions] = useState(false);
   const [detectionExpanded, setDetectionExpanded] = useState(true);
   const [routesExpanded, setRoutesExpanded] = useState(true);
+  const [demoRunKey, setDemoRunKey] = useState(0);
   const wasShowingDisruptions = useRef(false);
 
   const disruptionCount = disruptions.length;
@@ -223,6 +224,14 @@ export function HomeScreen() {
       setTestBusy(false);
     }
   }, [refetchDisruptions, testBusy]);
+
+  const runSampleRouteDetection = useCallback(() => {
+    if (!detectionExpanded) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setDetectionExpanded(true);
+    }
+    setDemoRunKey((value) => value + 1);
+  }, [detectionExpanded]);
 
   const openEditRoute = useCallback((route: Route) => {
     setDetectedDraft(null);
@@ -379,6 +388,13 @@ export function HomeScreen() {
                     >
                       <Text style={styles.testLabel}>Test disruption</Text>
                     </Pressable>
+                    <Pressable
+                      accessibilityRole='button'
+                      onPress={runSampleRouteDetection}
+                      style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
+                    >
+                      <Text style={styles.testLabel}>Test route</Text>
+                    </Pressable>
                   </View>
                 </View>
 
@@ -403,7 +419,7 @@ export function HomeScreen() {
                 onToggle={toggleDetection}
                 title='Detected frequent routes'
               >
-                <RouteDetectionDemo onSaveCandidate={openDetectedDraft} />
+                <RouteDetectionDemo demoRunKey={demoRunKey} onSaveCandidate={openDetectedDraft} />
               </DropdownSection>
 
               <DropdownSection

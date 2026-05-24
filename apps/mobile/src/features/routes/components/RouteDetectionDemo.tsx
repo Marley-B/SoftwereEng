@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Localization from "expo-localization";
 import * as Location from "expo-location";
@@ -227,19 +227,24 @@ function DetectedRouteCard({ expanded, index, labels, onSave, onToggle, route }:
 }
 
 interface RouteDetectionDemoProps {
+  demoRunKey?: number;
   onSaveCandidate: (draft: DetectedRouteDraft) => void;
 }
 
-export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps) {
+type SavedResultMode = "analysis" | "routes";
+
+export function RouteDetectionDemo({ demoRunKey = 0, onSaveCandidate }: RouteDetectionDemoProps) {
   const [hasRun, setHasRun] = useState(false);
   const [showDemoData, setShowDemoData] = useState(false);
   const [serverAnalysis, setServerAnalysis] = useState<{
     result: RouteDetectionResult;
     sampleCount: number;
   } | null>(null);
+  const [savedResultMode, setSavedResultMode] = useState<SavedResultMode | null>(null);
   const [serverAnalysisError, setServerAnalysisError] = useState<string | null>(null);
   const [expandedRoutes, setExpandedRoutes] = useState<Record<string, boolean>>({});
   const [endpointLabels, setEndpointLabels] = useState<Record<string, string>>({});
+  const lastDemoRunKey = useRef(demoRunKey);
   const tracker = useRouteDetectionTracking();
   const userTimeZone = Localization.getCalendars()[0]?.timeZone ?? "UTC";
   const activeSamples = showDemoData ? demoSamples() : tracker.samples;
@@ -251,6 +256,17 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
   const analysisSampleCount = serverAnalysis && !showDemoData ? serverAnalysis.sampleCount : activeSamples.length;
   const sourceLabel = showDemoData ? "sample data" : serverAnalysis ? "saved GPS" : "GPS";
   const canStop = tracker.isTracking || tracker.isBackgroundTracking;
+
+  useEffect(() => {
+    if (demoRunKey === lastDemoRunKey.current) {
+      return;
+    }
+    lastDemoRunKey.current = demoRunKey;
+    setShowDemoData(true);
+    setServerAnalysis(null);
+    setSavedResultMode(null);
+    setHasRun(true);
+  }, [demoRunKey]);
 
   useEffect(() => {
     if (!hasRun || analysisResult.recurringRoutes.length === 0) {
@@ -313,11 +329,11 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
 
   const labelsForRoute = (route: DetectedRecurringRoute, index: number) => ({
     destinationLabel:
-      (showDemoData ? demoEndpointLabel(route.destination) : null) ??
+      demoEndpointLabel(route.destination) ??
       endpointLabels[coordinateKey(route.destination)] ??
       fallbackEndpointLabel("destination", index),
     originLabel:
-      (showDemoData ? demoEndpointLabel(route.origin) : null) ??
+      demoEndpointLabel(route.origin) ??
       endpointLabels[coordinateKey(route.origin)] ??
       fallbackEndpointLabel("origin", index),
   });
@@ -341,21 +357,13 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
     };
   };
 
-  const analyzeSavedSamples = async () => {
+  const analyzeSavedSamples = async (mode: SavedResultMode) => {
     setHasRun(true);
     setShowDemoData(false);
+    setSavedResultMode(mode);
     setServerAnalysisError(null);
     try {
-      let analysis = await fetchSavedAnalysis();
-      if (analysis.result.recurringRoutes.length === 0) {
-        await apiRequest<{ inserted: number }>("/me/location-samples", {
-          method: "POST",
-          json: {
-            samples: demoSamples(),
-          },
-        });
-        analysis = await fetchSavedAnalysis();
-      }
+      const analysis = await fetchSavedAnalysis();
       setServerAnalysis(analysis);
     } catch (e) {
       const body = e instanceof ApiError ? (e.body as { error?: string }) : null;
@@ -375,6 +383,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
           onPress={() => {
             setShowDemoData(false);
             setServerAnalysis(null);
+            setSavedResultMode(null);
             setHasRun(true);
             void tracker.startTracking();
           }}
@@ -389,6 +398,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
             onPress={() => {
               setShowDemoData(false);
               setServerAnalysis(null);
+              setSavedResultMode(null);
               setHasRun(true);
               void tracker.startBackgroundTracking();
             }}
@@ -413,19 +423,15 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
-          onPress={() => {
-            setShowDemoData(true);
-            setServerAnalysis(null);
-            setHasRun(true);
-          }}
+          onPress={() => void analyzeSavedSamples("routes")}
           style={({ pressed }) => [styles.secondaryAction, pressed && styles.secondaryActionPressed]}
         >
           <Route color={authTheme.colors.primary} size={17} strokeWidth={2.4} />
-          <Text style={styles.secondaryActionLabel}>Use sample data</Text>
+          <Text style={styles.secondaryActionLabel}>Detected routes</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          onPress={() => void analyzeSavedSamples()}
+          onPress={() => void analyzeSavedSamples("analysis")}
           style={({ pressed }) => [styles.secondaryAction, pressed && styles.secondaryActionPressed]}
         >
           <Route color={authTheme.colors.primary} size={17} strokeWidth={2.4} />
@@ -436,6 +442,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
           onPress={() => {
             setShowDemoData(false);
             setServerAnalysis(null);
+            setSavedResultMode(null);
             setServerAnalysisError(null);
             resetDetectedRouteNotificationMemory();
             tracker.clearSamples();
@@ -450,37 +457,45 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
         <View style={styles.result}>
           <Text style={styles.resultLine}>Source: {sourceLabel}</Text>
           {serverAnalysis ? (
-            <View style={styles.analysisPanel}>
-              <Text style={styles.resultTitle}>Saved GPS analysis</Text>
-              <View style={styles.analysisMetricBlock}>
-                <AnalysisMetricRow label="Samples analyzed" value={analysisSampleCount} />
-                <AnalysisMetricRow label="Place clusters" value={analysisResult.stops.length} />
-                <AnalysisMetricRow label="Frequent routes" value={analysisResult.recurringRoutes.length} />
-                <AnalysisMetricRow
-                  label="Detection status"
-                  tone={analysisResult.recurringRoutes.length > 0 ? "positive" : "default"}
-                  value={routeAnalysisStatus(analysisResult)}
-                />
-                <AnalysisMetricRow label="Pattern strength" value={routeAnalysisStrength(analysisResult)} />
-              </View>
-              {analysisResult.recurringRoutes.length > 0 ? (
-                <View style={styles.patternSummaryBlock}>
-                  <Text style={styles.resultTitle}>Route pattern summary</Text>
-                  {analysisResult.recurringRoutes.map((route, index) => (
-                    <View key={`${route.origin.id}-${route.destination.id}-${index}-summary`} style={styles.patternCard}>
-                      <Text style={styles.patternName}>Route {index + 1}</Text>
-                      <Text style={styles.patternMain}>
-                        {route.typicalDepartureTime} {"->"} {route.typicalArrivalTime}
-                      </Text>
-                      <Text style={styles.patternMeta}>{formatDays(route.daysOfWeek)}</Text>
-                      <Text style={styles.patternMeta}>
-                        {route.tripCount} trips - {Math.round(route.confidence * 100)}% confidence
-                      </Text>
-                    </View>
-                  ))}
+            savedResultMode === "analysis" ? (
+              <View style={styles.analysisPanel}>
+                <Text style={styles.resultTitle}>Saved GPS analysis</Text>
+                <View style={styles.analysisMetricBlock}>
+                  <AnalysisMetricRow label="Samples analyzed" value={analysisSampleCount} />
+                  <AnalysisMetricRow label="Place clusters" value={analysisResult.stops.length} />
+                  <AnalysisMetricRow label="Frequent routes" value={analysisResult.recurringRoutes.length} />
+                  <AnalysisMetricRow
+                    label="Detection status"
+                    tone={analysisResult.recurringRoutes.length > 0 ? "positive" : "default"}
+                    value={routeAnalysisStatus(analysisResult)}
+                  />
+                  <AnalysisMetricRow label="Pattern strength" value={routeAnalysisStrength(analysisResult)} />
                 </View>
-              ) : null}
-            </View>
+                {analysisResult.recurringRoutes.length > 0 ? (
+                  <View style={styles.patternSummaryBlock}>
+                    <Text style={styles.resultTitle}>Route pattern summary</Text>
+                    {analysisResult.recurringRoutes.map((route, index) => (
+                      <View key={`${route.origin.id}-${route.destination.id}-${index}-summary`} style={styles.patternCard}>
+                        <Text style={styles.patternName}>Route {index + 1}</Text>
+                        <Text style={styles.patternMain}>
+                          {route.typicalDepartureTime} {"->"} {route.typicalArrivalTime}
+                        </Text>
+                        <Text style={styles.patternMeta}>{formatDays(route.daysOfWeek)}</Text>
+                        <Text style={styles.patternMeta}>
+                          {route.tripCount} trips - {Math.round(route.confidence * 100)}% confidence
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              <>
+                <Text style={styles.resultLine}>Samples: {analysisSampleCount}</Text>
+                <Text style={styles.resultLine}>Stops found: {analysisResult.stops.length}</Text>
+                <Text style={styles.resultLine}>Detected routes: {analysisResult.recurringRoutes.length}</Text>
+              </>
+            )
           ) : (
             <>
               <Text style={styles.resultLine}>Samples: {analysisSampleCount}</Text>
@@ -490,7 +505,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
           <Text style={styles.resultLine}>Permission: {tracker.permissionStatus ?? "unknown"}</Text>
           {tracker.error ? <Text style={styles.errorLine}>{tracker.error}</Text> : null}
           {serverAnalysisError ? <Text style={styles.errorLine}>{serverAnalysisError}</Text> : null}
-          {analysisResult.recurringRoutes.length > 0 && !serverAnalysis ? (
+          {analysisResult.recurringRoutes.length > 0 && (!serverAnalysis || savedResultMode === "routes") ? (
             <>
               <Text style={styles.resultTitle}>Detected routes</Text>
               {analysisResult.recurringRoutes.map((detectedRoute, index) => {
