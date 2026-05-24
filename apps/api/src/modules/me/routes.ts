@@ -6,6 +6,7 @@ import {
   disruptionResponseSchema,
   locationSamplesBodySchema,
   pushTokenBodySchema,
+  routeSuggestionSchema,
 } from "@route-helper/shared";
 import { createRequireAuth } from "../../hooks/requireAuth.js";
 
@@ -18,6 +19,19 @@ function occurredAtToIso(value: unknown): string {
   }
   return new Date(String(value)).toISOString();
 }
+
+const testSuggestedAlternative = routeSuggestionSchema.parse({
+  id: "test-alt-1",
+  label: "25 min",
+  durationSeconds: 25 * 60,
+  savingsSeconds: 8 * 60,
+  segments: [
+    { kind: "transit", modeLabel: "Subway", line: "Line 1" },
+    { kind: "walk", modeLabel: "Walk", line: "Walk 4 min" },
+  ],
+  payload: { source: "test-disruption" },
+  summary: "Saves about 8 min with 25 min",
+});
 
 export const registerMeRoutes: FastifyPluginAsync = async (app) => {
   const requireAuth = createRequireAuth(app.config.jwtSecret);
@@ -100,6 +114,7 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
         description: disruption.description,
         severity: disruption.severity,
         routeId: disruption.routeId,
+        suggestedAlternative: disruption.suggestedAlternative,
         affectedRoutes: routeName ? [routeName] : []
       })
     );
@@ -186,7 +201,7 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
 
     const [row] = await app.db
       .insert(disruptions)
-      .values({ userId, routeId: route.id, description, severity })
+      .values({ userId, routeId: route.id, description, severity, suggestedAlternative: testSuggestedAlternative })
       .returning();
 
     if (!row) {
@@ -199,6 +214,7 @@ export const registerMeRoutes: FastifyPluginAsync = async (app) => {
       description: row.description,
       severity: row.severity,
       routeId: row.routeId,
+      suggestedAlternative: row.suggestedAlternative,
       affectedRoutes: [route.name],
     });
   });

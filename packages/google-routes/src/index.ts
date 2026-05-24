@@ -61,6 +61,11 @@ export interface ParsedTransitOption {
   payload: Record<string, unknown>;
 }
 
+export interface SuggestedTransitAlternative extends ParsedTransitOption {
+  savingsSeconds: number;
+  summary: string;
+}
+
 /**
  * Calls Google Routes API computeRoutes (TRANSIT) and returns parsed alternatives.
  */
@@ -189,4 +194,48 @@ export const evaluateTransitRouteCheck = async (
     durationSeconds,
     ...(staticDurationSeconds !== undefined ? { staticDurationSeconds } : {})
   } satisfies TransitCheckResult;
+};
+
+export interface SuggestTransitAlternativeParams extends ComputeTransitRoutesParams {
+  /** Current delayed duration for the route that triggered the disruption. */
+  currentDurationSeconds: number;
+  /** Avoid recommending the saved option again when its generated id still matches. */
+  selectedOptionId?: string;
+  /** Ignore tiny improvements that are not worth changing plans for. */
+  minimumSavingsSeconds?: number;
+}
+
+function formatSavings(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return `Saves about ${minutes} min`;
+}
+
+export const suggestTransitAlternativeRoute = async (
+  params: SuggestTransitAlternativeParams
+): Promise<SuggestedTransitAlternative | null> => {
+  const options = await computeTransitRouteOptions({
+    apiKey: params.apiKey,
+    origin: params.origin,
+    destination: params.destination,
+    departureTimeRfc3339: params.departureTimeRfc3339,
+    computeAlternativeRoutes: true
+  });
+  const minimumSavingsSeconds = params.minimumSavingsSeconds ?? 60;
+  const candidates = options
+    .filter((option) => option.id !== params.selectedOptionId)
+    .map((option) => ({
+      ...option,
+      savingsSeconds: Math.max(0, params.currentDurationSeconds - option.durationSeconds)
+    }))
+    .filter((option) => option.savingsSeconds >= minimumSavingsSeconds)
+    .sort((a, b) => a.durationSeconds - b.durationSeconds);
+
+  const best = candidates[0];
+  if (!best) {
+    return null;
+  }
+  return {
+    ...best,
+    summary: `${formatSavings(best.savingsSeconds)} with ${best.label}`
+  };
 };

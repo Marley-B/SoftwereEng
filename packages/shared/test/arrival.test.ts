@@ -3,6 +3,7 @@ import {
   departureInstantForLocalWallClock,
   isPredictedArrivalWithinSlack,
   localDateStringInZone,
+  localWeekdayNameInZone,
 } from "../src/arrival.js";
 
 describe("arrival helpers", () => {
@@ -51,5 +52,11 @@ describe("arrival helpers", () => {
     const utc = new Date("2026-01-15T23:00:00.000Z");
     const d = localDateStringInZone(utc, "America/Los_Angeles");
     expect(d).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test("localWeekdayNameInZone returns day in route timezone", () => {
+    const utc = new Date("2026-01-05T00:30:00.000Z");
+    expect(localWeekdayNameInZone(utc, "UTC")).toBe("monday");
+    expect(localWeekdayNameInZone(utc, "America/Los_Angeles")).toBe("sunday");
   });
 });
