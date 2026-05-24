@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Localization from "expo-localization";
 import * as Location from "expo-location";
@@ -7,9 +7,11 @@ import {
   detectRecurringRoutes,
   type DetectedRecurringRoute,
   type LocationSample,
+  type RouteDetectionResult,
 } from "@route-helper/shared";
 
 import { authTheme } from "../../auth/theme";
+import { ApiError, apiRequest } from "../../../lib/apiClient";
 import type { DetectedRouteDraft } from "../types";
 import { useRouteDetectionTracking } from "../locationTracking";
 import {
@@ -69,6 +71,49 @@ function coordinateKey(endpoint: { lat: number; lng: number }): string {
 
 function coordinateLabel(endpoint: { lat: number; lng: number }): string {
   return `${endpoint.lat.toFixed(5)}, ${endpoint.lng.toFixed(5)}`;
+}
+
+function routeAnalysisStatus(result: RouteDetectionResult): string {
+  if (result.recurringRoutes.length > 0) {
+    return "Route found";
+  }
+  if (result.stops.length < 2) {
+    return "Needs another repeated place";
+  }
+  return "Needs a repeated start-to-end pattern";
+}
+
+function routeAnalysisStrength(result: RouteDetectionResult): string {
+  if (result.recurringRoutes.length === 0) {
+    return "Low";
+  }
+  const bestConfidence = Math.max(...result.recurringRoutes.map((route) => route.confidence));
+  if (bestConfidence >= 0.75) {
+    return "High";
+  }
+  if (bestConfidence >= 0.5) {
+    return "Medium";
+  }
+  return "Low";
+}
+
+function AnalysisMetricRow({
+  label,
+  tone = "default",
+  value,
+}: {
+  label: string;
+  tone?: "default" | "positive";
+  value: string | number;
+}) {
+  return (
+    <View style={styles.analysisMetricRow}>
+      <Text style={styles.analysisMetricLabel}>{label}</Text>
+      <Text style={[styles.analysisMetricValue, tone === "positive" && styles.analysisMetricValuePositive]}>
+        {value}
+      </Text>
+    </View>
+  );
 }
 
 function demoEndpointLabel(endpoint: { lat: number; lng: number }): string | null {
@@ -182,14 +227,24 @@ function DetectedRouteCard({ expanded, index, labels, onSave, onToggle, route }:
 }
 
 interface RouteDetectionDemoProps {
+  demoRunKey?: number;
   onSaveCandidate: (draft: DetectedRouteDraft) => void;
 }
 
-export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps) {
+type SavedResultMode = "analysis" | "routes";
+
+export function RouteDetectionDemo({ demoRunKey = 0, onSaveCandidate }: RouteDetectionDemoProps) {
   const [hasRun, setHasRun] = useState(false);
   const [showDemoData, setShowDemoData] = useState(false);
+  const [serverAnalysis, setServerAnalysis] = useState<{
+    result: RouteDetectionResult;
+    sampleCount: number;
+  } | null>(null);
+  const [savedResultMode, setSavedResultMode] = useState<SavedResultMode | null>(null);
+  const [serverAnalysisError, setServerAnalysisError] = useState<string | null>(null);
   const [expandedRoutes, setExpandedRoutes] = useState<Record<string, boolean>>({});
   const [endpointLabels, setEndpointLabels] = useState<Record<string, string>>({});
+  const lastDemoRunKey = useRef(demoRunKey);
   const tracker = useRouteDetectionTracking();
   const userTimeZone = Localization.getCalendars()[0]?.timeZone ?? "UTC";
   const activeSamples = showDemoData ? demoSamples() : tracker.samples;
@@ -197,15 +252,29 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
     () => detectRecurringRoutes(activeSamples, { timeZone: userTimeZone }),
     [activeSamples, userTimeZone],
   );
+  const analysisResult = serverAnalysis && !showDemoData ? serverAnalysis.result : result;
+  const analysisSampleCount = serverAnalysis && !showDemoData ? serverAnalysis.sampleCount : activeSamples.length;
+  const sourceLabel = showDemoData ? "sample data" : serverAnalysis ? "saved GPS" : "GPS";
   const canStop = tracker.isTracking || tracker.isBackgroundTracking;
 
   useEffect(() => {
-    if (!hasRun || result.recurringRoutes.length === 0) {
+    if (demoRunKey === lastDemoRunKey.current) {
+      return;
+    }
+    lastDemoRunKey.current = demoRunKey;
+    setShowDemoData(true);
+    setServerAnalysis(null);
+    setSavedResultMode(null);
+    setHasRun(true);
+  }, [demoRunKey]);
+
+  useEffect(() => {
+    if (!hasRun || analysisResult.recurringRoutes.length === 0) {
       return;
     }
     let cancelled = false;
     void (async () => {
-      for (const route of result.recurringRoutes) {
+      for (const route of analysisResult.recurringRoutes) {
         const sent = await notifyPotentialRouteDetected(route);
         if (!sent && !cancelled) {
           Alert.alert("Potential frequent route found", routeNotificationMessage(route));
@@ -215,14 +284,14 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
     return () => {
       cancelled = true;
     };
-  }, [hasRun, result.recurringRoutes.map(routeNotificationKey).join(",")]);
+  }, [hasRun, analysisResult.recurringRoutes.map(routeNotificationKey).join(",")]);
 
   useEffect(() => {
-    if (!hasRun || result.recurringRoutes.length === 0) {
+    if (!hasRun || analysisResult.recurringRoutes.length === 0) {
       return;
     }
     let cancelled = false;
-    const endpoints = result.recurringRoutes.flatMap((route) => [route.origin, route.destination]);
+    const endpoints = analysisResult.recurringRoutes.flatMap((route) => [route.origin, route.destination]);
     const missing = endpoints.filter((endpoint) => endpointLabels[coordinateKey(endpoint)] === undefined);
     if (missing.length === 0) {
       return;
@@ -250,7 +319,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
     return () => {
       cancelled = true;
     };
-  }, [endpointLabels, hasRun, result.recurringRoutes]);
+  }, [analysisResult.recurringRoutes, endpointLabels, hasRun]);
 
   const toggleRoute = (route: DetectedRecurringRoute, index: number) => {
     const key = `${route.origin.id}-${route.destination.id}-${index}`;
@@ -260,11 +329,11 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
 
   const labelsForRoute = (route: DetectedRecurringRoute, index: number) => ({
     destinationLabel:
-      (showDemoData ? demoEndpointLabel(route.destination) : null) ??
+      demoEndpointLabel(route.destination) ??
       endpointLabels[coordinateKey(route.destination)] ??
       fallbackEndpointLabel("destination", index),
     originLabel:
-      (showDemoData ? demoEndpointLabel(route.origin) : null) ??
+      demoEndpointLabel(route.origin) ??
       endpointLabels[coordinateKey(route.origin)] ??
       fallbackEndpointLabel("origin", index),
   });
@@ -275,6 +344,31 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
     labels: { destinationLabel: string; originLabel: string },
   ) => {
     onSaveCandidate(toDetectedDraft(route, index, labels));
+  };
+
+  const fetchSavedAnalysis = async () => {
+    const response = await apiRequest<{
+      result: RouteDetectionResult;
+      sampleCount: number;
+    }>("/me/route-analysis", { method: "GET" });
+    return {
+      result: response.result,
+      sampleCount: response.sampleCount,
+    };
+  };
+
+  const analyzeSavedSamples = async (mode: SavedResultMode) => {
+    setHasRun(true);
+    setShowDemoData(false);
+    setSavedResultMode(mode);
+    setServerAnalysisError(null);
+    try {
+      const analysis = await fetchSavedAnalysis();
+      setServerAnalysis(analysis);
+    } catch (e) {
+      const body = e instanceof ApiError ? (e.body as { error?: string }) : null;
+      setServerAnalysisError(body?.error ?? "Could not analyze saved GPS samples.");
+    }
   };
 
   return (
@@ -288,6 +382,8 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
           accessibilityRole="button"
           onPress={() => {
             setShowDemoData(false);
+            setServerAnalysis(null);
+            setSavedResultMode(null);
             setHasRun(true);
             void tracker.startTracking();
           }}
@@ -301,6 +397,8 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
             accessibilityRole="button"
             onPress={() => {
               setShowDemoData(false);
+              setServerAnalysis(null);
+              setSavedResultMode(null);
               setHasRun(true);
               void tracker.startBackgroundTracking();
             }}
@@ -325,19 +423,27 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
-          onPress={() => {
-            setShowDemoData(true);
-            setHasRun(true);
-          }}
+          onPress={() => void analyzeSavedSamples("routes")}
           style={({ pressed }) => [styles.secondaryAction, pressed && styles.secondaryActionPressed]}
         >
           <Route color={authTheme.colors.primary} size={17} strokeWidth={2.4} />
-          <Text style={styles.secondaryActionLabel}>Use sample data</Text>
+          <Text style={styles.secondaryActionLabel}>Detected routes</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void analyzeSavedSamples("analysis")}
+          style={({ pressed }) => [styles.secondaryAction, pressed && styles.secondaryActionPressed]}
+        >
+          <Route color={authTheme.colors.primary} size={17} strokeWidth={2.4} />
+          <Text style={styles.secondaryActionLabel}>Analyze saved</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
           onPress={() => {
             setShowDemoData(false);
+            setServerAnalysis(null);
+            setSavedResultMode(null);
+            setServerAnalysisError(null);
             resetDetectedRouteNotificationMemory();
             tracker.clearSamples();
           }}
@@ -349,17 +455,60 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
 
       {hasRun ? (
         <View style={styles.result}>
-          <Text style={styles.resultLine}>
-            Source: {showDemoData ? "sample data" : "GPS"}
-          </Text>
-          <Text style={styles.resultLine}>Samples: {activeSamples.length}</Text>
-          <Text style={styles.resultLine}>Stops found: {result.stops.length}</Text>
+          <Text style={styles.resultLine}>Source: {sourceLabel}</Text>
+          {serverAnalysis ? (
+            savedResultMode === "analysis" ? (
+              <View style={styles.analysisPanel}>
+                <Text style={styles.resultTitle}>Saved GPS analysis</Text>
+                <View style={styles.analysisMetricBlock}>
+                  <AnalysisMetricRow label="Samples analyzed" value={analysisSampleCount} />
+                  <AnalysisMetricRow label="Place clusters" value={analysisResult.stops.length} />
+                  <AnalysisMetricRow label="Frequent routes" value={analysisResult.recurringRoutes.length} />
+                  <AnalysisMetricRow
+                    label="Detection status"
+                    tone={analysisResult.recurringRoutes.length > 0 ? "positive" : "default"}
+                    value={routeAnalysisStatus(analysisResult)}
+                  />
+                  <AnalysisMetricRow label="Pattern strength" value={routeAnalysisStrength(analysisResult)} />
+                </View>
+                {analysisResult.recurringRoutes.length > 0 ? (
+                  <View style={styles.patternSummaryBlock}>
+                    <Text style={styles.resultTitle}>Route pattern summary</Text>
+                    {analysisResult.recurringRoutes.map((route, index) => (
+                      <View key={`${route.origin.id}-${route.destination.id}-${index}-summary`} style={styles.patternCard}>
+                        <Text style={styles.patternName}>Route {index + 1}</Text>
+                        <Text style={styles.patternMain}>
+                          {route.typicalDepartureTime} {"->"} {route.typicalArrivalTime}
+                        </Text>
+                        <Text style={styles.patternMeta}>{formatDays(route.daysOfWeek)}</Text>
+                        <Text style={styles.patternMeta}>
+                          {route.tripCount} trips - {Math.round(route.confidence * 100)}% confidence
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              <>
+                <Text style={styles.resultLine}>Samples: {analysisSampleCount}</Text>
+                <Text style={styles.resultLine}>Stops found: {analysisResult.stops.length}</Text>
+                <Text style={styles.resultLine}>Detected routes: {analysisResult.recurringRoutes.length}</Text>
+              </>
+            )
+          ) : (
+            <>
+              <Text style={styles.resultLine}>Samples: {analysisSampleCount}</Text>
+              <Text style={styles.resultLine}>Stops found: {analysisResult.stops.length}</Text>
+            </>
+          )}
           <Text style={styles.resultLine}>Permission: {tracker.permissionStatus ?? "unknown"}</Text>
           {tracker.error ? <Text style={styles.errorLine}>{tracker.error}</Text> : null}
-          {result.recurringRoutes.length > 0 ? (
+          {serverAnalysisError ? <Text style={styles.errorLine}>{serverAnalysisError}</Text> : null}
+          {analysisResult.recurringRoutes.length > 0 && (!serverAnalysis || savedResultMode === "routes") ? (
             <>
               <Text style={styles.resultTitle}>Detected routes</Text>
-              {result.recurringRoutes.map((detectedRoute, index) => {
+              {analysisResult.recurringRoutes.map((detectedRoute, index) => {
                 const key = `${detectedRoute.origin.id}-${detectedRoute.destination.id}-${index}`;
                 return (
                   <DetectedRouteCard
@@ -374,9 +523,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
                 );
               })}
             </>
-          ) : (
-            <Text style={styles.resultLine}>No recurring route found yet.</Text>
-          )}
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -407,6 +554,39 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: authTheme.space.sm,
   },
+  analysisMetricBlock: {
+    gap: 6,
+  },
+  analysisMetricLabel: {
+    color: authTheme.colors.muted,
+    flex: 1,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "700",
+  },
+  analysisMetricRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: authTheme.space.sm,
+    justifyContent: "space-between",
+  },
+  analysisMetricValue: {
+    color: authTheme.colors.foreground,
+    flexShrink: 1,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "800",
+    textAlign: "right",
+  },
+  analysisMetricValuePositive: {
+    color: authTheme.colors.primaryPressed,
+  },
+  analysisPanel: {
+    backgroundColor: authTheme.colors.surface,
+    borderColor: authTheme.colors.border,
+    borderRadius: authTheme.radii.control,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    gap: authTheme.space.sm,
+    padding: authTheme.space.sm,
+  },
   description: {
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.caption,
@@ -415,6 +595,33 @@ const styles = StyleSheet.create({
   },
   panel: {
     gap: authTheme.space.sm,
+  },
+  patternSummaryBlock: {
+    gap: 4,
+    paddingVertical: 2,
+  },
+  patternCard: {
+    backgroundColor: authTheme.colors.background,
+    borderColor: authTheme.colors.border,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 2,
+    padding: authTheme.space.sm,
+  },
+  patternMain: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.label,
+    fontWeight: "800",
+  },
+  patternMeta: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "700",
+  },
+  patternName: {
+    color: authTheme.colors.primaryPressed,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "800",
   },
   errorLine: {
     color: authTheme.colors.danger,

@@ -1,7 +1,12 @@
 import type { FastifyPluginAsync } from "fastify";
-import { and, desc, eq, isNull } from "drizzle-orm";
-import { disruptions, pushTokens, routes } from "@route-helper/db";
-import { disruptionResponseSchema, pushTokenBodySchema } from "@route-helper/shared";
+import { and, asc, desc, eq, gte, isNull } from "drizzle-orm";
+import { disruptions, pushTokens, routeLocationSamples, routes } from "@route-helper/db";
+import {
+  detectRecurringRoutes,
+  disruptionResponseSchema,
+  locationSamplesBodySchema,
+  pushTokenBodySchema,
+} from "@route-helper/shared";
 import { createRequireAuth } from "../../hooks/requireAuth.js";
 
 function occurredAtToIso(value: unknown): string {
@@ -16,6 +21,59 @@ function occurredAtToIso(value: unknown): string {
 
 export const registerMeRoutes: FastifyPluginAsync = async (app) => {
   const requireAuth = createRequireAuth(app.config.jwtSecret);
+
+  app.post("/location-samples", { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.auth?.userId;
+    if (!userId) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const parsed = locationSamplesBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "Invalid body", details: parsed.error.flatten() });
+    }
+    const values = parsed.data.samples
+      .map((sample) => ({
+        userId,
+        lat: sample.lat,
+        lng: sample.lng,
+        accuracyMeters: sample.accuracyMeters !== undefined ? Math.round(sample.accuracyMeters) : null,
+        recordedAt: new Date(sample.recordedAt),
+      }))
+      .filter((sample) => !Number.isNaN(sample.recordedAt.getTime()));
+    if (values.length === 0) {
+      return reply.status(400).send({ error: "No valid samples" });
+    }
+    await app.db.insert(routeLocationSamples).values(values);
+    return { inserted: values.length };
+  });
+
+  app.get("/route-analysis", { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.auth?.userId;
+    if (!userId) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const query = request.query as { days?: string } | undefined;
+    const days = Math.min(30, Math.max(1, Number.parseInt(query?.days ?? "14", 10) || 14));
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const rows = await app.db
+      .select()
+      .from(routeLocationSamples)
+      .where(and(eq(routeLocationSamples.userId, userId), gte(routeLocationSamples.recordedAt, cutoff)))
+      .orderBy(asc(routeLocationSamples.recordedAt));
+    const samples = rows.map((row) => ({
+      ...(row.accuracyMeters !== null ? { accuracyMeters: row.accuracyMeters } : {}),
+      lat: row.lat,
+      lng: row.lng,
+      recordedAt: row.recordedAt.toISOString(),
+    }));
+    const recentSamples = samples.slice(-5).reverse();
+    return {
+      days,
+      recentSamples,
+      sampleCount: samples.length,
+      result: detectRecurringRoutes(samples),
+    };
+  });
 
   app.get("/disruptions", { preHandler: requireAuth }, async (request, reply) => {
     const userId = request.auth?.userId;

@@ -17,10 +17,12 @@ import { apiRequest } from '../lib/apiClient';
 import { AuthPrimaryButton } from '../features/auth/components/AuthButtons';
 import { useAuth } from '../features/auth/context/AuthProvider';
 import { authTheme } from '../features/auth/theme';
+import type { Disruption } from '../features/disruptions/types';
 import { useDisruptionsContext } from '../features/disruptions/context/DisruptionsProvider';
 import { RouteDetectionDemo } from '../features/routes/components/RouteDetectionDemo';
 import { RouteFormModal } from '../features/routes/components/RouteFormModal';
 import { RouteListItem } from '../features/routes/components/RouteListItem';
+import { scheduledCommuteWindowSeconds } from '../features/routes/routeTimeUtils';
 import { RoutesOverviewMap } from '../features/routes/components/RoutesOverviewMap';
 import type { DetectedRouteDraft, Route, RouteCreateBody } from '../features/routes/types';
 import { useRoutes } from '../features/routes/useRoutes';
@@ -88,6 +90,71 @@ function HomeContent({ children, scrollEnabled = true }: HomeContentProps) {
   );
 }
 
+function formatDays(days: string[]): string {
+  if (days.length === 0) {
+    return 'No days selected';
+  }
+  return days.map((day) => day.slice(0, 3).toUpperCase()).join(', ');
+}
+
+function formatDuration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined) {
+    return 'Not available';
+  }
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return `${minutes} min`;
+}
+
+function disruptionsForRoute(route: Route, disruptions: Disruption[]): Disruption[] {
+  return disruptions.filter((disruption) =>
+    disruption.affectedRoutes.some((affected) => affected === route.id || affected === route.name),
+  );
+}
+
+function statusForRoute(route: Route, routeDisruptions: Disruption[]): string {
+  if (route.daysOfWeek.length === 0) {
+    return 'Needs schedule';
+  }
+  if (routeDisruptions.length >= 2) {
+    return 'Watch closely';
+  }
+  if (routeDisruptions.length === 1) {
+    return 'Recent alert';
+  }
+  return 'No recent alerts';
+}
+
+function SavedRoutesAnalysis({ disruptions, routes }: { disruptions: Disruption[]; routes: Route[] }) {
+  if (routes.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.analysisBlock}>
+      <Text style={styles.analysisTitle}>Saved route analysis</Text>
+      {routes.map((route) => {
+        const routeDisruptions = disruptionsForRoute(route, disruptions);
+        const tripWindowSeconds = scheduledCommuteWindowSeconds(route.startTime, route.expectedArrival);
+        return (
+          <View key={route.id} style={styles.analysisCard}>
+            <Text style={styles.analysisRouteName}>{route.name}</Text>
+            <Text style={styles.analysisLine}>{formatDays(route.daysOfWeek)}</Text>
+            <Text style={styles.analysisLine}>
+              {route.startTime} {'->'} {route.expectedArrival}
+            </Text>
+            <Text style={styles.analysisLine}>
+              Baseline trip: {formatDuration(route.transitSnapshot.baselineDurationSeconds)}
+            </Text>
+            <Text style={styles.analysisLine}>Planned window: {formatDuration(tripWindowSeconds)}</Text>
+            <Text style={styles.analysisLine}>Recent alerts: {routeDisruptions.length}</Text>
+            <Text style={styles.analysisStatus}>Status: {statusForRoute(route, routeDisruptions)}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function HomeScreen() {
   const { signOut: _signOut, user } = useAuth();
   const { routes, isLoading, error, refetch, createRoute, updateRoute, deleteRoute } = useRoutes();
@@ -100,6 +167,7 @@ export function HomeScreen() {
   const [showDisruptions, setShowDisruptions] = useState(false);
   const [detectionExpanded, setDetectionExpanded] = useState(true);
   const [routesExpanded, setRoutesExpanded] = useState(true);
+  const [demoRunKey, setDemoRunKey] = useState(0);
   const wasShowingDisruptions = useRef(false);
 
   const disruptionCount = disruptions.length;
@@ -150,12 +218,20 @@ export function HomeScreen() {
         },
       });
       await refetchDisruptions({ background: true });
-    } catch (e) {
-      // ignore — user can still see disruption list if the request failed
+    } catch {
+      // The disruption list still shows the current server state if this test helper fails.
     } finally {
       setTestBusy(false);
     }
   }, [refetchDisruptions, testBusy]);
+
+  const runSampleRouteDetection = useCallback(() => {
+    if (!detectionExpanded) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setDetectionExpanded(true);
+    }
+    setDemoRunKey((value) => value + 1);
+  }, [detectionExpanded]);
 
   const openEditRoute = useCallback((route: Route) => {
     setDetectedDraft(null);
@@ -233,9 +309,14 @@ export function HomeScreen() {
     if (routes.length === 0) {
       return <Text style={styles.empty}>No routes yet.</Text>;
     }
-    return routes.map((route) => (
-      <RouteListItem key={route.id} onDelete={onDelete} onEdit={openEditRoute} route={route} />
-    ));
+    return (
+      <>
+        <SavedRoutesAnalysis disruptions={disruptions} routes={routes} />
+        {routes.map((route) => (
+          <RouteListItem key={route.id} onDelete={onDelete} onEdit={openEditRoute} route={route} />
+        ))}
+      </>
+    );
   };
 
   if (!user) {
@@ -307,6 +388,13 @@ export function HomeScreen() {
                     >
                       <Text style={styles.testLabel}>Test disruption</Text>
                     </Pressable>
+                    <Pressable
+                      accessibilityRole='button'
+                      onPress={runSampleRouteDetection}
+                      style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
+                    >
+                      <Text style={styles.testLabel}>Test route</Text>
+                    </Pressable>
                   </View>
                 </View>
 
@@ -331,7 +419,7 @@ export function HomeScreen() {
                 onToggle={toggleDetection}
                 title='Detected frequent routes'
               >
-                <RouteDetectionDemo onSaveCandidate={openDetectedDraft} />
+                <RouteDetectionDemo demoRunKey={demoRunKey} onSaveCandidate={openDetectedDraft} />
               </DropdownSection>
 
               <DropdownSection
@@ -366,6 +454,37 @@ export function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  analysisBlock: {
+    gap: authTheme.space.sm,
+  },
+  analysisCard: {
+    backgroundColor: authTheme.colors.background,
+    borderColor: authTheme.colors.border,
+    borderRadius: authTheme.radii.control,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    gap: 4,
+    padding: authTheme.space.md,
+  },
+  analysisLine: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.caption,
+    fontWeight: '600',
+  },
+  analysisRouteName: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.label,
+    fontWeight: '800',
+  },
+  analysisStatus: {
+    color: authTheme.colors.primary,
+    fontSize: authTheme.typography.caption,
+    fontWeight: '800',
+  },
+  analysisTitle: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.label,
+    fontWeight: '800',
+  },
   badge: {
     alignItems: 'center',
     backgroundColor: authTheme.colors.danger,
@@ -472,16 +591,6 @@ const styles = StyleSheet.create({
     backgroundColor: authTheme.colors.background,
     ...(Platform.OS === 'web' ? { minHeight: '100vh' as never } : { flex: 1 }),
   },
-  webPageContent: {
-    gap: authTheme.space.sm,
-    paddingBottom: authTheme.space.xl * 4,
-    ...(Platform.OS === 'web'
-      ? {
-          minHeight: '100vh' as never,
-          overflow: 'visible' as never,
-        }
-      : {}),
-  },
   section: {
     backgroundColor: authTheme.colors.surface,
     borderColor: authTheme.colors.border,
@@ -566,5 +675,15 @@ const styles = StyleSheet.create({
     gap: 0,
     justifyContent: 'space-between',
     paddingTop: authTheme.space.sm,
+  },
+  webPageContent: {
+    gap: authTheme.space.sm,
+    paddingBottom: authTheme.space.xl * 4,
+    ...(Platform.OS === 'web'
+      ? {
+          minHeight: '100vh' as never,
+          overflow: 'visible' as never,
+        }
+      : {}),
   },
 });
