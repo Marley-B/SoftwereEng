@@ -2,16 +2,13 @@ import Constants from "expo-constants";
 
 const extra = Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined;
 
-/** Public API origin (same host as Fastify `apps/api`). */
-export const API_BASE_URL = extra?.apiBaseUrl ?? "http://127.0.0.1:3000";
+const API_BASE_URL = extra?.apiBaseUrl ?? "http://127.0.0.1:3000";
 
 let bearerToken: string | null = null;
 
 export const setBearerToken = (token: string | null): void => {
   bearerToken = token;
 };
-
-export const getBearerToken = (): string | null => bearerToken;
 
 export class ApiError extends Error {
   readonly status: number;

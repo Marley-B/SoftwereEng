@@ -6,15 +6,13 @@ export const createRequireAuth =
   async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const header = request.headers.authorization;
     if (header === undefined || !header.startsWith("Bearer ")) {
-      await reply.status(401).send({ error: "Unauthorized" });
-      return;
+      return reply.status(401).send({ error: "Unauthorized" });
     }
     const token = header.slice("Bearer ".length).trim();
     try {
       const payload = verifyAccessToken(jwtSecret, token);
       request.auth = { userId: payload.sub, email: payload.email };
     } catch {
-      await reply.status(401).send({ error: "Unauthorized" });
-      return;
+      return reply.status(401).send({ error: "Unauthorized" });
     }
   };

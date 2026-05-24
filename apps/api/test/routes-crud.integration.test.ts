@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import type { Database } from "@route-helper/db";

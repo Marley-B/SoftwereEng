@@ -14,7 +14,7 @@ export interface GoogleApiQuotaReject {
   used: number;
 }
 
-export interface GoogleApiQuotaOk {
+interface GoogleApiQuotaOk {
   ok: true;
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -22,6 +22,7 @@ import { RouteDetectionDemo } from '../features/routes/components/RouteDetection
 import { RouteFormModal } from '../features/routes/components/RouteFormModal';
 import { RouteListItem } from '../features/routes/components/RouteListItem';
 import { scheduledCommuteWindowSeconds } from '../features/routes/routeTimeUtils';
+import { RoutesOverviewMap } from '../features/routes/components/RoutesOverviewMap';
 import type { DetectedRouteDraft, Route, RouteCreateBody } from '../features/routes/types';
 import { useRoutes } from '../features/routes/useRoutes';
 import { registerExpoPushAndUpload } from '../lib/pushRegistration';
@@ -67,16 +68,19 @@ function DropdownSection({ children, expanded, onToggle, subtitle, title }: Drop
 
 interface HomeContentProps {
   children: React.ReactNode;
+  scrollEnabled?: boolean;
 }
 
-function HomeContent({ children }: HomeContentProps) {
+function HomeContent({ children, scrollEnabled = true }: HomeContentProps) {
   if (Platform.OS === 'web') {
     return <View style={styles.webPageContent}>{children}</View>;
   }
   return (
     <ScrollView
       contentContainerStyle={styles.pageContent}
+      keyboardShouldPersistTaps='handled'
       nestedScrollEnabled
+      scrollEnabled={scrollEnabled}
       showsVerticalScrollIndicator
       style={styles.pageScroll}
     >
@@ -153,7 +157,8 @@ function SavedRoutesAnalysis({ disruptions, routes }: { disruptions: Disruption[
 export function HomeScreen() {
   const { signOut: _signOut, user } = useAuth();
   const { routes, isLoading, error, refetch, createRoute, updateRoute, deleteRoute } = useRoutes();
-  const { disruptions } = useDisruptionsContext();
+  const { disruptions, refetch: refetchDisruptions } = useDisruptionsContext();
+  const [testBusy, setTestBusy] = useState(false);
 
   const [formVisible, setFormVisible] = useState(false);
   const [detectedDraft, setDetectedDraft] = useState<DetectedRouteDraft | null>(null);
@@ -161,6 +166,7 @@ export function HomeScreen() {
   const [showDisruptions, setShowDisruptions] = useState(false);
   const [detectionExpanded, setDetectionExpanded] = useState(true);
   const [routesExpanded, setRoutesExpanded] = useState(true);
+  const wasShowingDisruptions = useRef(false);
 
   const disruptionCount = disruptions.length;
 
@@ -173,6 +179,19 @@ export function HomeScreen() {
     });
   }, [user]);
 
+  // Sync badge after leaving the disruptions screen (dismissals, pull-to-refresh).
+  useEffect(() => {
+    if (showDisruptions) {
+      wasShowingDisruptions.current = true;
+      return;
+    }
+    if (!user || !wasShowingDisruptions.current) {
+      return;
+    }
+    wasShowingDisruptions.current = false;
+    void refetchDisruptions({ background: true });
+  }, [user, showDisruptions, refetchDisruptions]);
+
   const handleSignOut = useCallback(async () => {
     await _signOut();
   }, [_signOut]);
@@ -183,11 +202,49 @@ export function HomeScreen() {
     setFormVisible(true);
   }, []);
 
+  const createTestDisruption = useCallback(async (severity: 'info' | 'warn') => {
+    if (testBusy) {
+      return;
+    }
+    setTestBusy(true);
+    try {
+      await apiRequest('/me/disruptions/test', {
+        method: 'POST',
+        json: {
+          severity,
+          description: severity === 'info' ? 'Test possible delay' : 'Test disruption',
+        },
+      });
+      await refetchDisruptions({ background: true });
+    } catch (e) {
+      // ignore — user can still see disruption list if the request failed
+    } finally {
+      setTestBusy(false);
+    }
+  }, [refetchDisruptions, testBusy]);
+
   const openEditRoute = useCallback((route: Route) => {
     setDetectedDraft(null);
     setEditingRoute(route);
     setFormVisible(true);
   }, []);
+
+  const handleMapEditRoute = useCallback(
+    (routeId: string) => {
+      const route = routes.find((item) => item.id === routeId);
+      if (route) {
+        openEditRoute(route);
+      }
+    },
+    [openEditRoute, routes],
+  );
+
+  const handleMapDeleteRoute = useCallback(
+    (routeId: string) => {
+      void deleteRoute(routeId);
+    },
+    [deleteRoute],
+  );
 
   const openDetectedDraft = useCallback((draft: DetectedRouteDraft) => {
     setEditingRoute(null);
@@ -286,8 +343,9 @@ export function HomeScreen() {
               </Pressable>
             </View>
           ) : (
-            <HomeContent>
-              <View style={styles.topRow}>
+            <>
+              <HomeContent>
+                <View style={styles.topRow}>
                 <Pressable
                   accessibilityLabel='Sign out'
                   accessibilityRole='button'
@@ -303,6 +361,24 @@ export function HomeScreen() {
                     Your routes
                   </Text>
                   <Text style={styles.subtitle}>Manage automatic detection and saved commutes.</Text>
+                  <View style={styles.testRow}>
+                    <Pressable
+                      accessibilityRole='button'
+                      disabled={testBusy}
+                      onPress={() => void createTestDisruption('info')}
+                      style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
+                    >
+                      <Text style={styles.testLabel}>Test delay</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole='button'
+                      disabled={testBusy}
+                      onPress={() => void createTestDisruption('warn')}
+                      style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
+                    >
+                      <Text style={styles.testLabel}>Test disruption</Text>
+                    </Pressable>
+                  </View>
                 </View>
 
                 <Pressable
@@ -338,12 +414,21 @@ export function HomeScreen() {
                 {renderSavedRoutes()}
               </DropdownSection>
 
+              <View style={styles.mapSectionPinned}>
+                <RoutesOverviewMap
+                  onDeleteRoute={handleMapDeleteRoute}
+                  onEditRoute={handleMapEditRoute}
+                  routes={routes}
+                />
+              </View>
+
               {!isLoading ? (
                 <View style={styles.footer}>
                   <AuthPrimaryButton label='Add route' onPress={openAddRoute} />
                 </View>
               ) : null}
-            </HomeContent>
+              </HomeContent>
+            </>
           )}
         </View>
       </View>
@@ -425,7 +510,12 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingBottom: authTheme.space.sm,
-    paddingTop: authTheme.space.md,
+    paddingTop: authTheme.space.xs,
+  },
+  mapSectionPinned: {
+    gap: authTheme.space.sm,
+    paddingBottom: authTheme.space.lg,
+    paddingTop: authTheme.space.xs,
   },
   hint: {
     color: authTheme.colors.muted,

@@ -6,6 +6,7 @@ import type { Disruption } from '../types';
 interface DisruptionListItemProps {
   disruption: Disruption;
   onDismiss: (id: string) => void | Promise<void>;
+  onViewAlternatives?: (routeId: string | null, compact?: boolean) => void | Promise<void>;
 }
 
 function formatOccurredAt(iso: string): string {
@@ -19,7 +20,7 @@ function formatOccurredAt(iso: string): string {
   });
 }
 
-export function DisruptionListItem({ disruption, onDismiss }: DisruptionListItemProps) {
+export function DisruptionListItem({ disruption, onDismiss, onViewAlternatives }: DisruptionListItemProps) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -36,15 +37,29 @@ export function DisruptionListItem({ disruption, onDismiss }: DisruptionListItem
         </View>
       ) : null}
 
-      <Pressable
-        accessibilityLabel='Dismiss disruption'
-        accessibilityRole='button'
-        hitSlop={8}
-        onPress={() => void onDismiss(disruption.id)}
-        style={({ pressed }) => [styles.dismissBtn, pressed && styles.dismissBtnPressed]}
-      >
-        <Text style={styles.dismissLabel}>Dismiss</Text>
-      </Pressable>
+      <View style={styles.actionsRow}>
+        {disruption.routeId ? (
+            <Pressable
+              accessibilityLabel='View alternative routes'
+              accessibilityRole='button'
+              hitSlop={8}
+              onPress={() => void onViewAlternatives?.(disruption.routeId, true)}
+              style={({ pressed }) => [styles.altBtn, pressed && styles.altBtnPressed]}
+            >
+              <Text style={styles.altLabel}>View alternatives</Text>
+            </Pressable>
+          ) : null}
+
+        <Pressable
+          accessibilityLabel='Dismiss disruption'
+          accessibilityRole='button'
+          hitSlop={8}
+          onPress={() => void onDismiss(disruption.id)}
+          style={({ pressed }) => [styles.dismissBtn, pressed && styles.dismissBtnPressed]}
+        >
+          <Text style={styles.dismissLabel}>Dismiss</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -75,6 +90,28 @@ const styles = StyleSheet.create({
   },
   dismissBtnPressed: {
     opacity: 0.7,
+  },
+  actionsRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: authTheme.space.sm,
+    marginTop: authTheme.space.sm,
+  },
+  altBtn: {
+    alignItems: 'center',
+    backgroundColor: authTheme.colors.primary,
+    borderRadius: authTheme.radii.control,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: authTheme.space.md,
+  },
+  altBtnPressed: {
+    opacity: 0.7,
+  },
+  altLabel: {
+    color: authTheme.colors.onPrimary,
+    fontSize: authTheme.typography.label,
+    fontWeight: '700',
   },
   dismissLabel: {
     color: authTheme.colors.muted,
