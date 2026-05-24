@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { loginBodySchema, registerBodySchema, routeCreateBodySchema } from "../src/index.js";
+import { disruptionResponseSchema, loginBodySchema, registerBodySchema, routeCreateBodySchema } from "../src/index.js";
 
 describe("shared zod schemas", () => {
   test("registerBodySchema validates email and password length", () => {
@@ -111,5 +111,27 @@ describe("shared zod schemas", () => {
       },
     };
     expect(routeCreateBodySchema.safeParse(body).success).toBe(false);
+  });
+
+  test("disruptionResponseSchema accepts suggested alternatives", () => {
+    expect(
+      disruptionResponseSchema.safeParse({
+        id: "11111111-1111-4111-8111-111111111111",
+        occurredAt: "2026-01-01T08:00:00.000Z",
+        description: "Route delayed",
+        severity: "warn",
+        routeId: "22222222-2222-4222-8222-222222222222",
+        affectedRoutes: ["Morning route"],
+        suggestedAlternative: {
+          id: "alt-1",
+          label: "32 min",
+          durationSeconds: 1920,
+          savingsSeconds: 480,
+          segments: [{ kind: "transit", modeLabel: "Subway", line: "M1" }],
+          payload: {},
+          summary: "Saves about 8 min with 32 min",
+        },
+      }).success,
+    ).toBe(true);
   });
 });

@@ -15,6 +15,20 @@
       "when": 1779384300000,
       "tag": "0001_add_days_of_week",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779638400000,
+      "tag": "0002_add_route_location_samples",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779638500000,
+      "tag": "0003_add_disruption_suggested_alternative",
+      "breakpoints": true
     }
   ]
 }

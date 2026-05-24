@@ -91,6 +91,7 @@ export const disruptions = pgTable(
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
     description: text("description").notNull(),
     severity: text("severity").notNull().default("warn"),
+    suggestedAlternative: jsonb("suggested_alternative"),
     dismissedAt: timestamp("dismissed_at", { withTimezone: true })
   },
   (t) => [index("disruptions_user_occurred_idx").on(t.userId, t.occurredAt)]

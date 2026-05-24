@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { computeTransitRouteOptions } from "../src/index.js";
+import { computeTransitRouteOptions, suggestTransitAlternativeRoute } from "../src/index.js";
 import { summarizeTransitLegs } from "../src/transitStepSummary.js";
 
 describe("summarizeTransitLegs", () => {
@@ -77,6 +77,42 @@ describe("summarizeTransitLegs", () => {
       });
       expect(options[0]?.payload).toMatchObject({
         polyline: { encodedPolyline: "abc123" },
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("suggestTransitAlternativeRoute returns fastest useful live alternative", async () => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          routes: [
+            { duration: "2200s", legs: [] },
+            { duration: "1500s", localizedValues: { duration: { text: "25 min" } }, legs: [] },
+            { duration: "1800s", legs: [] },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+
+    try {
+      const suggestion = await suggestTransitAlternativeRoute({
+        apiKey: "test-key",
+        origin: { lat: 1, lng: 2 },
+        destination: { lat: 3, lng: 4 },
+        departureTimeRfc3339: "2026-05-23T10:00:00Z",
+        currentDurationSeconds: 2200,
+        selectedOptionId: "alt-0",
+      });
+
+      expect(suggestion).toMatchObject({
+        id: "alt-1",
+        durationSeconds: 1500,
+        savingsSeconds: 700,
+        summary: "Saves about 12 min with 25 min",
       });
     } finally {
       globalThis.fetch = originalFetch;

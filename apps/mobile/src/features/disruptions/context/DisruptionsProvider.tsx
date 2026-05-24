@@ -13,6 +13,7 @@ import { AppState, type AppStateStatus } from "react-native";
 import { ApiError, apiRequest } from "../../../lib/apiClient";
 import { useAuth } from "../../auth/context/AuthProvider";
 import type { Disruption } from "../types";
+import type { RouteSuggestion } from "@route-helper/shared";
 
 interface DisruptionDto {
   id: string;
@@ -20,6 +21,7 @@ interface DisruptionDto {
   description: string;
   severity: string;
   routeId: string | null;
+  suggestedAlternative?: RouteSuggestion | null;
   affectedRoutes: string[];
 }
 
@@ -43,6 +45,7 @@ function mapDto(d: DisruptionDto): Disruption {
     occurredAt: d.occurredAt,
     description: d.description,
     routeId: d.routeId,
+    suggestedAlternative: d.suggestedAlternative ?? null,
     affectedRoutes: d.affectedRoutes,
   };
 }
