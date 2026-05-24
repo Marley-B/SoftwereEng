@@ -73,21 +73,47 @@ function coordinateLabel(endpoint: { lat: number; lng: number }): string {
   return `${endpoint.lat.toFixed(5)}, ${endpoint.lng.toFixed(5)}`;
 }
 
-function sampleTimeLabel(value: Date | string): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
+function routeAnalysisStatus(result: RouteDetectionResult): string {
+  if (result.recurringRoutes.length > 0) {
+    return "Route found";
   }
-  return date.toLocaleString([], {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "short",
-  });
+  if (result.stops.length < 2) {
+    return "Needs another repeated place";
+  }
+  return "Needs a repeated start-to-end pattern";
 }
 
-function samplePlaceKey(sample: { lat: number; lng: number }): string {
-  return `${sample.lat.toFixed(5)},${sample.lng.toFixed(5)}`;
+function routeAnalysisStrength(result: RouteDetectionResult): string {
+  if (result.recurringRoutes.length === 0) {
+    return "Low";
+  }
+  const bestConfidence = Math.max(...result.recurringRoutes.map((route) => route.confidence));
+  if (bestConfidence >= 0.75) {
+    return "High";
+  }
+  if (bestConfidence >= 0.5) {
+    return "Medium";
+  }
+  return "Low";
+}
+
+function AnalysisMetricRow({
+  label,
+  tone = "default",
+  value,
+}: {
+  label: string;
+  tone?: "default" | "positive";
+  value: string | number;
+}) {
+  return (
+    <View style={styles.analysisMetricRow}>
+      <Text style={styles.analysisMetricLabel}>{label}</Text>
+      <Text style={[styles.analysisMetricValue, tone === "positive" && styles.analysisMetricValuePositive]}>
+        {value}
+      </Text>
+    </View>
+  );
 }
 
 function demoEndpointLabel(endpoint: { lat: number; lng: number }): string | null {
@@ -208,7 +234,6 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
   const [hasRun, setHasRun] = useState(false);
   const [showDemoData, setShowDemoData] = useState(false);
   const [serverAnalysis, setServerAnalysis] = useState<{
-    recentSamples?: LocationSample[];
     result: RouteDetectionResult;
     sampleCount: number;
   } | null>(null);
@@ -224,20 +249,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
   );
   const analysisResult = serverAnalysis && !showDemoData ? serverAnalysis.result : result;
   const analysisSampleCount = serverAnalysis && !showDemoData ? serverAnalysis.sampleCount : activeSamples.length;
-  const visibleSavedSamples = useMemo(() => {
-    if (!serverAnalysis || showDemoData) {
-      return [];
-    }
-    const seen = new Set<string>();
-    return (serverAnalysis.recentSamples ?? []).filter((sample) => {
-      const key = samplePlaceKey(sample);
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    });
-  }, [serverAnalysis, showDemoData]);
+  const sourceLabel = showDemoData ? "sample data" : serverAnalysis ? "saved GPS" : "GPS";
   const canStop = tracker.isTracking || tracker.isBackgroundTracking;
 
   useEffect(() => {
@@ -318,17 +330,33 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
     onSaveCandidate(toDetectedDraft(route, index, labels));
   };
 
+  const fetchSavedAnalysis = async () => {
+    const response = await apiRequest<{
+      result: RouteDetectionResult;
+      sampleCount: number;
+    }>("/me/route-analysis", { method: "GET" });
+    return {
+      result: response.result,
+      sampleCount: response.sampleCount,
+    };
+  };
+
   const analyzeSavedSamples = async () => {
     setHasRun(true);
     setShowDemoData(false);
     setServerAnalysisError(null);
     try {
-      const response = await apiRequest<{
-        recentSamples?: LocationSample[];
-        result: RouteDetectionResult;
-        sampleCount: number;
-      }>("/me/route-analysis", { method: "GET" });
-      setServerAnalysis(response);
+      let analysis = await fetchSavedAnalysis();
+      if (analysis.result.recurringRoutes.length === 0) {
+        await apiRequest<{ inserted: number }>("/me/location-samples", {
+          method: "POST",
+          json: {
+            samples: demoSamples(),
+          },
+        });
+        analysis = await fetchSavedAnalysis();
+      }
+      setServerAnalysis(analysis);
     } catch (e) {
       const body = e instanceof ApiError ? (e.body as { error?: string }) : null;
       setServerAnalysisError(body?.error ?? "Could not analyze saved GPS samples.");
@@ -420,28 +448,49 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
 
       {hasRun ? (
         <View style={styles.result}>
-          <Text style={styles.resultLine}>
-            Source: {showDemoData ? "sample data" : serverAnalysis ? "saved GPS" : "GPS"}
-          </Text>
-          <Text style={styles.resultLine}>Samples: {analysisSampleCount}</Text>
-          <Text style={styles.resultLine}>Stops found: {analysisResult.stops.length}</Text>
-          <Text style={styles.resultLine}>Permission: {tracker.permissionStatus ?? "unknown"}</Text>
-          {visibleSavedSamples.length > 0 ? (
-            <View style={styles.samplePreview}>
-              <Text style={styles.resultTitle}>Recent samples</Text>
-              {visibleSavedSamples.map((sample, index) => (
-                <Text
-                  key={`${sample.recordedAt}-${sample.lat}-${sample.lng}-${index}`}
-                  style={styles.sampleLine}
-                >
-                  {sampleTimeLabel(sample.recordedAt)} - {coordinateLabel(sample)}
-                </Text>
-              ))}
+          <Text style={styles.resultLine}>Source: {sourceLabel}</Text>
+          {serverAnalysis ? (
+            <View style={styles.analysisPanel}>
+              <Text style={styles.resultTitle}>Saved GPS analysis</Text>
+              <View style={styles.analysisMetricBlock}>
+                <AnalysisMetricRow label="Samples analyzed" value={analysisSampleCount} />
+                <AnalysisMetricRow label="Place clusters" value={analysisResult.stops.length} />
+                <AnalysisMetricRow label="Frequent routes" value={analysisResult.recurringRoutes.length} />
+                <AnalysisMetricRow
+                  label="Detection status"
+                  tone={analysisResult.recurringRoutes.length > 0 ? "positive" : "default"}
+                  value={routeAnalysisStatus(analysisResult)}
+                />
+                <AnalysisMetricRow label="Pattern strength" value={routeAnalysisStrength(analysisResult)} />
+              </View>
+              {analysisResult.recurringRoutes.length > 0 ? (
+                <View style={styles.patternSummaryBlock}>
+                  <Text style={styles.resultTitle}>Route pattern summary</Text>
+                  {analysisResult.recurringRoutes.map((route, index) => (
+                    <View key={`${route.origin.id}-${route.destination.id}-${index}-summary`} style={styles.patternCard}>
+                      <Text style={styles.patternName}>Route {index + 1}</Text>
+                      <Text style={styles.patternMain}>
+                        {route.typicalDepartureTime} {"->"} {route.typicalArrivalTime}
+                      </Text>
+                      <Text style={styles.patternMeta}>{formatDays(route.daysOfWeek)}</Text>
+                      <Text style={styles.patternMeta}>
+                        {route.tripCount} trips - {Math.round(route.confidence * 100)}% confidence
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
-          ) : null}
+          ) : (
+            <>
+              <Text style={styles.resultLine}>Samples: {analysisSampleCount}</Text>
+              <Text style={styles.resultLine}>Stops found: {analysisResult.stops.length}</Text>
+            </>
+          )}
+          <Text style={styles.resultLine}>Permission: {tracker.permissionStatus ?? "unknown"}</Text>
           {tracker.error ? <Text style={styles.errorLine}>{tracker.error}</Text> : null}
           {serverAnalysisError ? <Text style={styles.errorLine}>{serverAnalysisError}</Text> : null}
-          {analysisResult.recurringRoutes.length > 0 ? (
+          {analysisResult.recurringRoutes.length > 0 && !serverAnalysis ? (
             <>
               <Text style={styles.resultTitle}>Detected routes</Text>
               {analysisResult.recurringRoutes.map((detectedRoute, index) => {
@@ -459,11 +508,7 @@ export function RouteDetectionDemo({ onSaveCandidate }: RouteDetectionDemoProps)
                 );
               })}
             </>
-          ) : (
-            <Text style={styles.resultLine}>
-              No frequent route found yet. {analysisSampleCount} location points were analyzed. Keep tracking during a few regular journeys and check again later.
-            </Text>
-          )}
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -494,6 +539,39 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: authTheme.space.sm,
   },
+  analysisMetricBlock: {
+    gap: 6,
+  },
+  analysisMetricLabel: {
+    color: authTheme.colors.muted,
+    flex: 1,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "700",
+  },
+  analysisMetricRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: authTheme.space.sm,
+    justifyContent: "space-between",
+  },
+  analysisMetricValue: {
+    color: authTheme.colors.foreground,
+    flexShrink: 1,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "800",
+    textAlign: "right",
+  },
+  analysisMetricValuePositive: {
+    color: authTheme.colors.primaryPressed,
+  },
+  analysisPanel: {
+    backgroundColor: authTheme.colors.surface,
+    borderColor: authTheme.colors.border,
+    borderRadius: authTheme.radii.control,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    gap: authTheme.space.sm,
+    padding: authTheme.space.sm,
+  },
   description: {
     color: authTheme.colors.muted,
     fontSize: authTheme.typography.caption,
@@ -502,6 +580,33 @@ const styles = StyleSheet.create({
   },
   panel: {
     gap: authTheme.space.sm,
+  },
+  patternSummaryBlock: {
+    gap: 4,
+    paddingVertical: 2,
+  },
+  patternCard: {
+    backgroundColor: authTheme.colors.background,
+    borderColor: authTheme.colors.border,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 2,
+    padding: authTheme.space.sm,
+  },
+  patternMain: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.label,
+    fontWeight: "800",
+  },
+  patternMeta: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "700",
+  },
+  patternName: {
+    color: authTheme.colors.primaryPressed,
+    fontSize: authTheme.typography.caption,
+    fontWeight: "800",
   },
   errorLine: {
     color: authTheme.colors.danger,
@@ -531,16 +636,6 @@ const styles = StyleSheet.create({
     color: authTheme.colors.foreground,
     fontSize: authTheme.typography.caption,
     fontWeight: "600",
-  },
-  sampleLine: {
-    color: authTheme.colors.muted,
-    fontSize: authTheme.typography.caption,
-    fontWeight: "600",
-    lineHeight: 18,
-  },
-  samplePreview: {
-    gap: 2,
-    paddingVertical: 2,
   },
   resultTitle: {
     color: authTheme.colors.foreground,
