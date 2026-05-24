@@ -1,0 +1,1 @@
+ALTER TABLE "routes" ADD COLUMN IF NOT EXISTS "days_of_week" text[] DEFAULT '{"monday","tuesday","wednesday","thursday","friday","saturday","sunday"}' NOT NULL;
