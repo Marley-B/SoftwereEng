@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogOut, MessageSquareWarning } from 'lucide-react-native';
 
+import { apiRequest } from '../lib/apiClient';
 import { AuthPrimaryButton } from '../features/auth/components/AuthButtons';
 import { useAuth } from '../features/auth/context/AuthProvider';
 import { authTheme } from '../features/auth/theme';
@@ -216,8 +217,8 @@ export function HomeScreen() {
         },
       });
       await refetchDisruptions({ background: true });
-    } catch (e) {
-      // ignore — user can still see disruption list if the request failed
+    } catch {
+      // The disruption list still shows the current server state if this test helper fails.
     } finally {
       setTestBusy(false);
     }
@@ -630,6 +631,27 @@ const styles = StyleSheet.create({
   titleBlock: {
     flex: 1,
     paddingHorizontal: authTheme.space.sm,
+  },
+  testRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: authTheme.space.xs,
+    marginTop: authTheme.space.xs,
+  },
+  testBtn: {
+    borderColor: authTheme.colors.border,
+    borderRadius: authTheme.radii.control,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    paddingHorizontal: authTheme.space.sm,
+    paddingVertical: authTheme.space.xs,
+  },
+  testBtnPressed: {
+    opacity: 0.6,
+  },
+  testLabel: {
+    color: authTheme.colors.primary,
+    fontSize: authTheme.typography.caption,
+    fontWeight: '700',
   },
   topRow: {
     alignItems: 'center',

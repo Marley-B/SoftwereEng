@@ -175,5 +175,6 @@ export {
   detectRecurringRoutes,
   distanceMeters,
   type DetectedRecurringRoute,
-  type LocationSample
+  type LocationSample,
+  type RouteDetectionResult
 } from "./routeDetection/index";

@@ -47,7 +47,7 @@ export interface DetectedRecurringRoute {
   typicalDepartureTime: string;
 }
 
-interface RouteDetectionResult {
+export interface RouteDetectionResult {
   recurringRoutes: DetectedRecurringRoute[];
   recurringEndpoints: RecurringEndpoint[];
   stops: DetectedStop[];
