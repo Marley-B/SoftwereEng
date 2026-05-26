@@ -17,11 +17,19 @@ const TRIGGER_WINDOW_MS = 5 * 60 * 1000;
 export interface RunDueChecksDeps {
   db: Database;
   googleApiKey: string;
+  now?: Date;
+  evaluateRouteCheck?: typeof evaluateTransitRouteCheck;
+  sendPushNotification?: typeof sendExpoPushNotification;
 }
 
 export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> => {
-  const { db, googleApiKey } = deps;
-  const now = new Date();
+  const {
+    db,
+    googleApiKey,
+    now = new Date(),
+    evaluateRouteCheck = evaluateTransitRouteCheck,
+    sendPushNotification = sendExpoPushNotification,
+  } = deps;
 
   const rows = await db.select().from(routes);
   for (const route of rows) {
@@ -73,7 +81,7 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
       let summary = "ok";
       let possibleDelay = false;
       try {
-        const check = await evaluateTransitRouteCheck({
+        const check = await evaluateRouteCheck({
           apiKey: googleApiKey,
           origin: { lat: origin.lat, lng: origin.lng },
           destination: { lat: destination.lat, lng: destination.lng },
@@ -146,7 +154,7 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
       const title = possibleDelay ? "Possible route delay" : "Route disruption";
       for (const { token } of tokens) {
         try {
-          await sendExpoPushNotification({
+          await sendPushNotification({
             to: token,
             title,
             body: description,
