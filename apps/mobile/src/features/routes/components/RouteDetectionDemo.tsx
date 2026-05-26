@@ -429,14 +429,7 @@ export function RouteDetectionDemo({ demoRunKey = 0, onSaveCandidate }: RouteDet
           <Route color={authTheme.colors.primary} size={17} strokeWidth={2.4} />
           <Text style={styles.secondaryActionLabel}>Detected routes</Text>
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void analyzeSavedSamples("analysis")}
-          style={({ pressed }) => [styles.secondaryAction, pressed && styles.secondaryActionPressed]}
-        >
-          <Route color={authTheme.colors.primary} size={17} strokeWidth={2.4} />
-          <Text style={styles.secondaryActionLabel}>Analyze saved</Text>
-        </Pressable>
+
         <Pressable
           accessibilityRole="button"
           onPress={() => {

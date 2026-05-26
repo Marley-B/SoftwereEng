@@ -124,37 +124,6 @@ function statusForRoute(route: Route, routeDisruptions: Disruption[]): string {
   return 'No recent alerts';
 }
 
-function SavedRoutesAnalysis({ disruptions, routes }: { disruptions: Disruption[]; routes: Route[] }) {
-  if (routes.length === 0) {
-    return null;
-  }
-
-  return (
-    <View style={styles.analysisBlock}>
-      <Text style={styles.analysisTitle}>Saved route analysis</Text>
-      {routes.map((route) => {
-        const routeDisruptions = disruptionsForRoute(route, disruptions);
-        const tripWindowSeconds = scheduledCommuteWindowSeconds(route.startTime, route.expectedArrival);
-        return (
-          <View key={route.id} style={styles.analysisCard}>
-            <Text style={styles.analysisRouteName}>{route.name}</Text>
-            <Text style={styles.analysisLine}>{formatDays(route.daysOfWeek)}</Text>
-            <Text style={styles.analysisLine}>
-              {route.startTime} {'->'} {route.expectedArrival}
-            </Text>
-            <Text style={styles.analysisLine}>
-              Baseline trip: {formatDuration(route.transitSnapshot.baselineDurationSeconds)}
-            </Text>
-            <Text style={styles.analysisLine}>Planned window: {formatDuration(tripWindowSeconds)}</Text>
-            <Text style={styles.analysisLine}>Recent alerts: {routeDisruptions.length}</Text>
-            <Text style={styles.analysisStatus}>Status: {statusForRoute(route, routeDisruptions)}</Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 export function HomeScreen() {
   const { signOut: _signOut, user } = useAuth();
   const { routes, isLoading, error, refetch, createRoute, updateRoute, deleteRoute } = useRoutes();
@@ -311,7 +280,6 @@ export function HomeScreen() {
     }
     return (
       <>
-        <SavedRoutesAnalysis disruptions={disruptions} routes={routes} />
         {routes.map((route) => (
           <RouteListItem key={route.id} onDelete={onDelete} onEdit={openEditRoute} route={route} />
         ))}
