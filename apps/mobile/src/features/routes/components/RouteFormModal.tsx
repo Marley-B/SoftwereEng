@@ -62,6 +62,23 @@ function defaultMorning(): Date {
   return d;
 }
 
+/**
+ * Normalize a user-typed time input so only digits are accepted and a colon
+ * is automatically inserted. Examples:
+ *  - "9" -> "9"
+ *  - "93" -> "93"
+ *  - "930" -> "9:30"
+ *  - "0930" -> "09:30"
+ */
+function normalizeTimeInput(input: string): string {
+  const digits = (input ?? "").replace(/\D/g, "");
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return digits;
+  if (digits.length === 3) return `${digits.slice(0, 1)}:${digits.slice(1, 3)}`;
+  // length >= 4
+  return `${digits.slice(0, 2)}:${digits.slice(2, 4)}`;
+}
+
 // ─── Time picker popup modal ──────────────────────────────────────────────────
 
 interface TimePickerModalProps {
@@ -292,8 +309,9 @@ export function RouteFormModal({
       setDestPlace(null);
       setStartDate(morning);
       setArrivalDate(ten);
-      setWebStart(formatRouteTime(morning));
-      setWebArrival(formatRouteTime(ten));
+      // Do not pre-fill web text inputs; let the user type the times explicitly.
+      setWebStart("");
+      setWebArrival("");
       setDaysOfWeek([...WEEKDAYS]);
     }
     setTransitOptions([]);
@@ -610,7 +628,7 @@ export function RouteFormModal({
                     autoCapitalize="none"
                     label="Start time"
                     onChangeText={(t) => {
-                      setWebStart(t);
+                      setWebStart(normalizeTimeInput(t));
                     }}
                     placeholder="9:00"
                     value={webStart}
@@ -619,7 +637,7 @@ export function RouteFormModal({
                     autoCapitalize="none"
                     label="Expected arrival"
                     onChangeText={(t) => {
-                      setWebArrival(t);
+                      setWebArrival(normalizeTimeInput(t));
                     }}
                     placeholder="10:00"
                     value={webArrival}
