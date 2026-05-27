@@ -1,66 +1,43 @@
-# Minimal User Authentication Template
+# Habits Tracking App
 
-A minimal monorepo template with user authentication and basic project structure.
+## Plan
 
-## Prompts used
+1. Build a single main interface where all habits actions are available.
+2. Add state management with strict TypeScript interfaces.
+3. Persist all state in browser `localStorage`.
+4. Add undo support using state snapshots.
+5. Show confirmation messages after every user action.
+6. Render a compliance calendar for the current month.
 
-- Looking at the current code as a template, we are going to create a new app, can you change the code so it only has the most basic stuff relating to the inicialization of a new project? The new project will not need either a worker or an api, it will however need users so only mantain this part of the code and the basic structure
+## User Stories Coverage
 
-## Structure
+- **US-01 Define personal habits**
+  - Main interface form to create habits.
+  - Action can be undone using `Undo`.
+  - Confirmation toast shown after creation.
+  - Saved in `localStorage`.
 
-- `apps/api` - Fastify API with user registration and login
-- `packages/db` - PostgreSQL database schema with Drizzle ORM
-- `packages/shared` - Shared TypeScript types and Zod validation schemas
+- **US-02 Mark habits as completed**
+  - Checkbox in main habits list for today.
+  - Action can be undone using `Undo`.
+  - Confirmation toast shown after toggle.
+  - Saved in `localStorage`.
 
-## Features
+- **US-03 Compliance calendar**
+  - Main interface includes current month calendar.
+  - Calendar updates from saved completion data.
+  - If data changes, `Undo` reverts those changes.
+  - Confirmation toast shown after user-triggered actions affecting compliance.
 
-- User registration and login via JWT tokens
-- Password hashing with scrypt
-- PostgreSQL database integration
-- TypeScript throughout
-- Minimal, clean codebase for extending
+- **US-04 Delete old habits**
+  - Delete button in main list.
+  - Action can be undone using `Undo`.
+  - Confirmation toast shown after deletion.
+  - Saved in `localStorage`.
 
-## Quick Start
+## Run
 
-1. Install Bun: https://bun.sh
-2. Run `bun install`
-3. Set up environment variables:
-   ```
-   DATABASE_URL=postgresql://user:password@localhost:5432/dbname
-   JWT_SECRET=your_secret_key
-   API_HOST=0.0.0.0
-   API_PORT=3000
-   ```
-4. Run migrations: `bun run --filter @route-helper/db migrate` (if applicable)
-5. Start the API: `bun run dev`
-
-## API Endpoints
-
-- `POST /auth/register` - Register a new user
-  ```json
-  {
-    "email": "user@example.com",
-    "password": "password123",
-    "displayName": "User Name"
-  }
-  ```
-
-- `POST /auth/login` - Login user
-  ```json
-  {
-    "email": "user@example.com",
-    "password": "password123"
-  }
-  ```
-
-- `GET /health` - Health check
-
-## Testing
-
-- `bun run test` - Run all tests
-- `bun run test:api` - Run API tests
-- `bun run test:shared` - Run shared package tests
-
-## Type Checking
-
-- `bun run typecheck` - Check types across all packages
+```bash
+npm install
+npm run dev
+```
