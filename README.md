@@ -2,6 +2,10 @@
 
 A minimal monorepo template with user authentication and basic project structure.
 
+## Prompts used
+
+- Looking at the current code as a template, we are going to create a new app, can you change the code so it only has the most basic stuff relating to the inicialization of a new project? The new project will not need either a worker or an api, it will however need users so only mantain this part of the code and the basic structure
+
 ## Structure
 
 - `apps/api` - Fastify API with user registration and login
