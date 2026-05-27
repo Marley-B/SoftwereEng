@@ -4,6 +4,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { PlaceRef } from '@route-helper/shared';
 import { authTheme } from '../../auth/theme';
+import { extractEncodedPolylines } from './routeMapUtils';
 
 export type RouteEndpointCoordinate =
   | {
@@ -20,48 +21,6 @@ interface RouteEndpointsMapProps {
 
 const MAP_HEIGHT = 240;
 const STATIC_SIZE = '640x240';
-
-function extractEncodedPolylines(payload: unknown): string[] {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return [];
-  }
-  const legs = (payload as Record<string, unknown>)['legs'];
-  if (!Array.isArray(legs) || legs.length === 0) {
-    return [];
-  }
-
-  const polylines: string[] = [];
-  for (const leg of legs) {
-    if (!leg || typeof leg !== 'object') {
-      continue;
-    }
-    const steps = (leg as Record<string, unknown>)['steps'];
-    if (!Array.isArray(steps)) {
-      continue;
-    }
-
-    for (const step of steps) {
-      if (!step || typeof step !== 'object') {
-        continue;
-      }
-      const polyline = (step as Record<string, unknown>)['polyline'];
-      if (!polyline || typeof polyline !== 'object') {
-        continue;
-      }
-      const encoded =
-        typeof (polyline as Record<string, unknown>)['encodedPolyline'] === 'string'
-          ? (polyline as Record<string, unknown>)['encodedPolyline'] as string
-          : typeof (polyline as Record<string, unknown>)['points'] === 'string'
-          ? (polyline as Record<string, unknown>)['points'] as string
-          : undefined;
-      if (encoded && encoded.trim().length > 0) {
-        polylines.push(encoded.trim());
-      }
-    }
-  }
-
-  return polylines;
-}
 
 /** Google Static Maps only (no Apple MapKit / native map views). */
 function normalizeEndpoint(endpoint: RouteEndpointCoordinate | null): { latitude: number; longitude: number } | null {

@@ -17,10 +17,13 @@ import { apiRequest } from '../lib/apiClient';
 import { AuthPrimaryButton } from '../features/auth/components/AuthButtons';
 import { useAuth } from '../features/auth/context/AuthProvider';
 import { authTheme } from '../features/auth/theme';
+import type { Disruption } from '../features/disruptions/types';
 import { useDisruptionsContext } from '../features/disruptions/context/DisruptionsProvider';
 import { RouteDetectionDemo } from '../features/routes/components/RouteDetectionDemo';
 import { RouteFormModal } from '../features/routes/components/RouteFormModal';
 import { RouteListItem } from '../features/routes/components/RouteListItem';
+import { scheduledCommuteWindowSeconds } from '../features/routes/routeTimeUtils';
+import { RoutesOverviewMap } from '../features/routes/components/RoutesOverviewMap';
 import type { DetectedRouteDraft, Route, RouteCreateBody } from '../features/routes/types';
 import { useRoutes } from '../features/routes/useRoutes';
 import { registerExpoPushAndUpload } from '../lib/pushRegistration';
@@ -66,22 +69,59 @@ function DropdownSection({ children, expanded, onToggle, subtitle, title }: Drop
 
 interface HomeContentProps {
   children: React.ReactNode;
+  scrollEnabled?: boolean;
 }
 
-function HomeContent({ children }: HomeContentProps) {
+function HomeContent({ children, scrollEnabled = true }: HomeContentProps) {
   if (Platform.OS === 'web') {
     return <View style={styles.webPageContent}>{children}</View>;
   }
   return (
     <ScrollView
       contentContainerStyle={styles.pageContent}
+      keyboardShouldPersistTaps='handled'
       nestedScrollEnabled
+      scrollEnabled={scrollEnabled}
       showsVerticalScrollIndicator
       style={styles.pageScroll}
     >
       {children}
     </ScrollView>
   );
+}
+
+function formatDays(days: string[]): string {
+  if (days.length === 0) {
+    return 'No days selected';
+  }
+  return days.map((day) => day.slice(0, 3).toUpperCase()).join(', ');
+}
+
+function formatDuration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined) {
+    return 'Not available';
+  }
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return `${minutes} min`;
+}
+
+function disruptionsForRoute(route: Route, disruptions: Disruption[]): Disruption[] {
+  return disruptions.filter((disruption) =>
+    disruption.affectedRoutes.some((affected) => affected === route.id || affected === route.name),
+  );
+}
+
+function statusForRoute(route: Route, routeDisruptions: Disruption[]): string {
+  if (route.daysOfWeek.length === 0) {
+    return 'Needs schedule';
+  }
+  if (routeDisruptions.length >= 2) {
+    return 'Watch closely';
+  }
+  if (routeDisruptions.length === 1) {
+    return 'Recent alert';
+  }
+  return 'No recent alerts';
 }
 
 export function HomeScreen() {
@@ -96,6 +136,7 @@ export function HomeScreen() {
   const [showDisruptions, setShowDisruptions] = useState(false);
   const [detectionExpanded, setDetectionExpanded] = useState(true);
   const [routesExpanded, setRoutesExpanded] = useState(true);
+  const [demoRunKey, setDemoRunKey] = useState(0);
   const wasShowingDisruptions = useRef(false);
 
   const disruptionCount = disruptions.length;
@@ -146,18 +187,43 @@ export function HomeScreen() {
         },
       });
       await refetchDisruptions({ background: true });
-    } catch (e) {
-      // ignore — user can still see disruption list if the request failed
+    } catch {
+      // The disruption list still shows the current server state if this test helper fails.
     } finally {
       setTestBusy(false);
     }
   }, [refetchDisruptions, testBusy]);
+
+  const runSampleRouteDetection = useCallback(() => {
+    if (!detectionExpanded) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setDetectionExpanded(true);
+    }
+    setDemoRunKey((value) => value + 1);
+  }, [detectionExpanded]);
 
   const openEditRoute = useCallback((route: Route) => {
     setDetectedDraft(null);
     setEditingRoute(route);
     setFormVisible(true);
   }, []);
+
+  const handleMapEditRoute = useCallback(
+    (routeId: string) => {
+      const route = routes.find((item) => item.id === routeId);
+      if (route) {
+        openEditRoute(route);
+      }
+    },
+    [openEditRoute, routes],
+  );
+
+  const handleMapDeleteRoute = useCallback(
+    (routeId: string) => {
+      void deleteRoute(routeId);
+    },
+    [deleteRoute],
+  );
 
   const openDetectedDraft = useCallback((draft: DetectedRouteDraft) => {
     setEditingRoute(null);
@@ -212,9 +278,13 @@ export function HomeScreen() {
     if (routes.length === 0) {
       return <Text style={styles.empty}>No routes yet.</Text>;
     }
-    return routes.map((route) => (
-      <RouteListItem key={route.id} onDelete={onDelete} onEdit={openEditRoute} route={route} />
-    ));
+    return (
+      <>
+        {routes.map((route) => (
+          <RouteListItem key={route.id} onDelete={onDelete} onEdit={openEditRoute} route={route} />
+        ))}
+      </>
+    );
   };
 
   if (!user) {
@@ -251,8 +321,9 @@ export function HomeScreen() {
               </Pressable>
             </View>
           ) : (
-            <HomeContent>
-              <View style={styles.topRow}>
+            <>
+              <HomeContent>
+                <View style={styles.topRow}>
                 <Pressable
                   accessibilityLabel='Sign out'
                   accessibilityRole='button'
@@ -285,6 +356,13 @@ export function HomeScreen() {
                     >
                       <Text style={styles.testLabel}>Test disruption</Text>
                     </Pressable>
+                    <Pressable
+                      accessibilityRole='button'
+                      onPress={runSampleRouteDetection}
+                      style={({ pressed }) => [styles.testBtn, pressed && styles.testBtnPressed]}
+                    >
+                      <Text style={styles.testLabel}>Test route</Text>
+                    </Pressable>
                   </View>
                 </View>
 
@@ -309,7 +387,7 @@ export function HomeScreen() {
                 onToggle={toggleDetection}
                 title='Detected frequent routes'
               >
-                <RouteDetectionDemo onSaveCandidate={openDetectedDraft} />
+                <RouteDetectionDemo demoRunKey={demoRunKey} onSaveCandidate={openDetectedDraft} />
               </DropdownSection>
 
               <DropdownSection
@@ -321,12 +399,21 @@ export function HomeScreen() {
                 {renderSavedRoutes()}
               </DropdownSection>
 
+              <View style={styles.mapSectionPinned}>
+                <RoutesOverviewMap
+                  onDeleteRoute={handleMapDeleteRoute}
+                  onEditRoute={handleMapEditRoute}
+                  routes={routes}
+                />
+              </View>
+
               {!isLoading ? (
                 <View style={styles.footer}>
                   <AuthPrimaryButton label='Add route' onPress={openAddRoute} />
                 </View>
               ) : null}
-            </HomeContent>
+              </HomeContent>
+            </>
           )}
         </View>
       </View>
@@ -335,6 +422,37 @@ export function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  analysisBlock: {
+    gap: authTheme.space.sm,
+  },
+  analysisCard: {
+    backgroundColor: authTheme.colors.background,
+    borderColor: authTheme.colors.border,
+    borderRadius: authTheme.radii.control,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    gap: 4,
+    padding: authTheme.space.md,
+  },
+  analysisLine: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.caption,
+    fontWeight: '600',
+  },
+  analysisRouteName: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.label,
+    fontWeight: '800',
+  },
+  analysisStatus: {
+    color: authTheme.colors.primary,
+    fontSize: authTheme.typography.caption,
+    fontWeight: '800',
+  },
+  analysisTitle: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.label,
+    fontWeight: '800',
+  },
   badge: {
     alignItems: 'center',
     backgroundColor: authTheme.colors.danger,
@@ -377,7 +495,12 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingBottom: authTheme.space.sm,
-    paddingTop: authTheme.space.md,
+    paddingTop: authTheme.space.xs,
+  },
+  mapSectionPinned: {
+    gap: authTheme.space.sm,
+    paddingBottom: authTheme.space.lg,
+    paddingTop: authTheme.space.xs,
   },
   hint: {
     color: authTheme.colors.muted,
@@ -435,16 +558,6 @@ const styles = StyleSheet.create({
   safe: {
     backgroundColor: authTheme.colors.background,
     ...(Platform.OS === 'web' ? { minHeight: '100vh' as never } : { flex: 1 }),
-  },
-  webPageContent: {
-    gap: authTheme.space.sm,
-    paddingBottom: authTheme.space.xl * 4,
-    ...(Platform.OS === 'web'
-      ? {
-          minHeight: '100vh' as never,
-          overflow: 'visible' as never,
-        }
-      : {}),
   },
   section: {
     backgroundColor: authTheme.colors.surface,
@@ -530,5 +643,15 @@ const styles = StyleSheet.create({
     gap: 0,
     justifyContent: 'space-between',
     paddingTop: authTheme.space.sm,
+  },
+  webPageContent: {
+    gap: authTheme.space.sm,
+    paddingBottom: authTheme.space.xl * 4,
+    ...(Platform.OS === 'web'
+      ? {
+          minHeight: '100vh' as never,
+          overflow: 'visible' as never,
+        }
+      : {}),
   },
 });

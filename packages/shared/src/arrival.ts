@@ -70,3 +70,6 @@ export const departureInstantForLocalWallClock = (args: {
 
 export const localDateStringInZone = (utc: Date, timeZone: string): string =>
   DateTime.fromJSDate(utc, { zone: "utc" }).setZone(timeZone).toISODate() ?? "";
+
+export const localWeekdayNameInZone = (utc: Date, timeZone: string): string =>
+  DateTime.fromJSDate(utc, { zone: "utc" }).setZone(timeZone).weekdayLong?.toLowerCase() ?? "";

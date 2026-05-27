@@ -20,7 +20,13 @@ function formatOccurredAt(iso: string): string {
   });
 }
 
+function formatMinutes(seconds: number): string {
+  return `${Math.max(1, Math.round(seconds / 60))} min`;
+}
+
 export function DisruptionListItem({ disruption, onDismiss, onViewAlternatives }: DisruptionListItemProps) {
+  const suggestion = disruption.suggestedAlternative;
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -34,6 +40,22 @@ export function DisruptionListItem({ disruption, onDismiss, onViewAlternatives }
         <View style={styles.routesRow}>
           <Text style={styles.routesLabel}>Affects: </Text>
           <Text style={styles.routesValue}>{disruption.affectedRoutes.join(', ')}</Text>
+        </View>
+      ) : null}
+
+      {suggestion ? (
+        <View style={styles.suggestionBox}>
+          <Text style={styles.suggestionTitle}>Suggested alternative</Text>
+          <Text style={styles.suggestionSummary}>{suggestion.summary}</Text>
+          <Text style={styles.suggestionMeta}>
+            {formatMinutes(suggestion.durationSeconds)}
+            {suggestion.savingsSeconds > 0 ? ` · saves ${formatMinutes(suggestion.savingsSeconds)}` : ""}
+          </Text>
+          {suggestion.segments?.slice(0, 3).map((segment, index) => (
+            <Text key={`${suggestion.id}-${index}`} style={styles.suggestionSegment}>
+              {segment.modeLabel} · {segment.line}
+            </Text>
+          ))}
         </View>
       ) : null}
 
@@ -143,6 +165,35 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: authTheme.typography.caption,
     fontWeight: '700',
+  },
+  suggestionBox: {
+    backgroundColor: authTheme.colors.background,
+    borderColor: authTheme.colors.border,
+    borderRadius: authTheme.radii.control,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    gap: 4,
+    padding: authTheme.space.sm,
+  },
+  suggestionMeta: {
+    color: authTheme.colors.primary,
+    fontSize: authTheme.typography.caption,
+    fontWeight: '800',
+  },
+  suggestionSegment: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.caption,
+    fontWeight: '600',
+  },
+  suggestionSummary: {
+    color: authTheme.colors.foreground,
+    fontSize: authTheme.typography.body,
+    fontWeight: '700',
+  },
+  suggestionTitle: {
+    color: authTheme.colors.muted,
+    fontSize: authTheme.typography.caption,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   time: {
     color: authTheme.colors.muted,

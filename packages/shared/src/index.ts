@@ -36,6 +36,19 @@ export const transitOptionSchema = z.object({
 
 export type TransitOption = z.infer<typeof transitOptionSchema>;
 
+export const routeSuggestionSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  durationSeconds: z.number().int().nonnegative(),
+  staticDurationSeconds: z.number().int().nonnegative().optional(),
+  savingsSeconds: z.number().int().nonnegative(),
+  segments: z.array(transitSegmentSchema).optional(),
+  payload: z.record(z.unknown()),
+  summary: z.string().min(1)
+});
+
+export type RouteSuggestion = z.infer<typeof routeSuggestionSchema>;
+
 /** Persisted with the route for worker replay and UI. */
 export const transitSnapshotSchema = z.object({
   optionsRequest: z.object({
@@ -132,12 +145,26 @@ export const routeResponseSchema = z.object({
 
 export type RouteResponse = z.infer<typeof routeResponseSchema>;
 
+export const locationSampleSchema = z.object({
+  accuracyMeters: z.number().nonnegative().optional(),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  recordedAt: z.string().min(1)
+});
+
+export const locationSamplesBodySchema = z.object({
+  samples: z.array(locationSampleSchema).min(1).max(500)
+});
+
+export type LocationSamplesBody = z.infer<typeof locationSamplesBodySchema>;
+
 export const disruptionResponseSchema = z.object({
   id: z.string().uuid(),
   occurredAt: z.string(),
   description: z.string(),
   severity: z.string(),
   routeId: z.string().uuid().nullable(),
+  suggestedAlternative: routeSuggestionSchema.nullable().optional(),
   affectedRoutes: z.array(z.string())
 });
 
@@ -154,7 +181,8 @@ export type RouteUpdateBody = z.infer<typeof routeUpdateBodySchema>;
 export {
   departureInstantForLocalWallClock,
   isPredictedArrivalWithinSlack,
-  localDateStringInZone
+  localDateStringInZone,
+  localWeekdayNameInZone
 } from "./arrival";
 
 export {
@@ -162,5 +190,6 @@ export {
   detectRecurringRoutes,
   distanceMeters,
   type DetectedRecurringRoute,
-  type LocationSample
+  type LocationSample,
+  type RouteDetectionResult
 } from "./routeDetection/index";

@@ -59,6 +59,28 @@ describeIntegration("GET /me/disruptions (integration)", () => {
       throw new Error("Failed to insert test route");
     }
     routeId = r.id;
+
+    const [d] = await db
+      .insert(disruptions)
+      .values({
+        userId,
+        routeId,
+        description: `Route “Test line”: ${marker}`,
+        severity: "warn",
+        suggestedAlternative: {
+          id: "alt-1",
+          label: "25 min",
+          durationSeconds: 1500,
+          savingsSeconds: 300,
+          payload: {},
+          summary: "Saves about 5 min with 25 min",
+        },
+      })
+      .returning({ id: disruptions.id });
+    if (!d) {
+      throw new Error("Failed to insert test disruption");
+    }
+    disruptionId = d.id;
   });
 
   afterAll(async () => {
@@ -100,6 +122,7 @@ describeIntegration("GET /me/disruptions (integration)", () => {
       occurredAt: string;
       affectedRoutes: string[];
       routeId: string | null;
+      suggestedAlternative?: { id: string; savingsSeconds: number } | null;
     }>;
     expect(Array.isArray(body)).toBe(true);
     const found = body.find((row) => row.routeId === routeId && row.description.includes(marker));
@@ -110,6 +133,7 @@ describeIntegration("GET /me/disruptions (integration)", () => {
     expect(typeof found?.occurredAt).toBe("string");
     expect(Array.isArray(found?.affectedRoutes)).toBe(true);
     expect(found?.routeId).toBe(routeId);
+    expect(found?.suggestedAlternative).toMatchObject({ id: "alt-1", savingsSeconds: 300 });
     expect(found?.affectedRoutes).toEqual(["Disruption test route"]);
   });
 });

@@ -1,12 +1,14 @@
 import { and, eq } from "drizzle-orm";
 import type { Database } from "@route-helper/db";
 import { disruptions, pushTokens, routeCheckRuns, routes } from "@route-helper/db";
-import { evaluateTransitRouteCheck } from "@route-helper/google-routes";
+import { evaluateTransitRouteCheck, suggestTransitAlternativeRoute } from "@route-helper/google-routes";
 import {
   departureInstantForLocalWallClock,
   isPredictedArrivalWithinSlack,
   localDateStringInZone,
+  localWeekdayNameInZone,
   placeRefSchema,
+  routeSuggestionSchema,
   transitSnapshotSchema,
 } from "@route-helper/shared";
 import { sendExpoPushNotification } from "../notifications/expoPushClient.js";
@@ -51,6 +53,10 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
     }
 
     const localDate = localDateStringInZone(dep, route.timezone);
+    const localWeekday = localWeekdayNameInZone(dep, route.timezone);
+    if (!route.daysOfWeek.includes(localWeekday)) {
+      continue;
+    }
 
     for (const offset of OFFSETS_MIN) {
       const triggerAt = new Date(depMs + offset * 60 * 1000);
@@ -80,6 +86,7 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
       let ok = true;
       let summary = "ok";
       let possibleDelay = false;
+      let currentDurationSeconds: number | undefined;
       try {
         const check = await evaluateRouteCheck({
           apiKey: googleApiKey,
@@ -93,8 +100,10 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
         });
         ok = check.ok;
         summary = check.summary;
+        currentDurationSeconds = check.durationSeconds;
         if (ok) {
           const durationSeconds = check.durationSeconds ?? snapshot.baselineDurationSeconds;
+          currentDurationSeconds = durationSeconds;
           // Upper threshold: after this we consider a real disruption
           const arrivalUpper = isPredictedArrivalWithinSlack({
             departureUtc: dep,
@@ -139,11 +148,29 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
       }
 
       const description = `Route “${route.name}”: ${summary}`;
+      let suggestedAlternative: unknown = null;
+      if (currentDurationSeconds !== undefined) {
+        try {
+          const suggestion = await suggestTransitAlternativeRoute({
+            apiKey: googleApiKey,
+            origin: { lat: origin.lat, lng: origin.lng },
+            destination: { lat: destination.lat, lng: destination.lng },
+            departureTimeRfc3339: dep.toISOString(),
+            currentDurationSeconds,
+            selectedOptionId: snapshot.selectedOptionId,
+          });
+          suggestedAlternative = suggestion ? routeSuggestionSchema.parse(suggestion) : null;
+        } catch {
+          suggestedAlternative = null;
+        }
+      }
+
       await db.insert(disruptions).values({
         userId: route.userId,
         routeId: route.id,
         description,
         severity: possibleDelay ? "info" : "warn",
+        suggestedAlternative,
       });
 
       const tokens = await db

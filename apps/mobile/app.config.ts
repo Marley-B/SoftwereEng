@@ -1,4 +1,8 @@
-import { ExpoConfig } from "expo/config";
+import path from 'node:path';
+import { config as loadEnv } from 'dotenv';
+import { ExpoConfig } from 'expo/config';
+
+loadEnv({ path: path.resolve(__dirname, '.env') });
 
 const config: ExpoConfig = {
   name: "Route Helper",
