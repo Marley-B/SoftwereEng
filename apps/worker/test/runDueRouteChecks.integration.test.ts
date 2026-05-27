@@ -141,7 +141,8 @@ describeIntegration("runDueRouteChecks (integration)", () => {
       evaluateRouteCheck: async () => ({
         ok: true,
         summary: "Route looks OK",
-        durationSeconds: 95 * 60,
+        // 8:00 + 96m => 9:36, which is outside +5m slack but within +10m slack.
+        durationSeconds: 96 * 60,
       }),
       sendPushNotification: async (payload) => {
         notifications.push({
