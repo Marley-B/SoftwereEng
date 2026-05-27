@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "main": "src/index.ts",
   "scripts": {
+    "expo": "expo",
     "test": "bun test ./test/*.test.ts",
     "dev": "expo start",
     "android": "expo start --android",

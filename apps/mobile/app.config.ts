@@ -33,11 +33,15 @@ const config: ExpoConfig = {
     supportsTablet: true
   },
   android: {
+    package: "com.d.kalinskyy.routehelper",
     adaptiveIcon: {
       backgroundColor: "#FFFFFF"
     }
   },
   extra: {
+    eas: {
+      projectId: "ae6cbe34-830f-421c-92f5-ace1afbe9b0e"
+    },
     apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:3000",
     easProjectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? "",
     /** Maps Static API key — map preview only (enable “Maps Static API” in Google Cloud). */
