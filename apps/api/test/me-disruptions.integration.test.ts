@@ -60,27 +60,6 @@ describeIntegration("GET /me/disruptions (integration)", () => {
     }
     routeId = r.id;
 
-    const [d] = await db
-      .insert(disruptions)
-      .values({
-        userId,
-        routeId,
-        description: `Route “Test line”: ${marker}`,
-        severity: "warn",
-        suggestedAlternative: {
-          id: "alt-1",
-          label: "25 min",
-          durationSeconds: 1500,
-          savingsSeconds: 300,
-          payload: {},
-          summary: "Saves about 5 min with 25 min",
-        },
-      })
-      .returning({ id: disruptions.id });
-    if (!d) {
-      throw new Error("Failed to insert test disruption");
-    }
-    disruptionId = d.id;
   });
 
   afterAll(async () => {
@@ -97,6 +76,15 @@ describeIntegration("GET /me/disruptions (integration)", () => {
       evaluateRouteCheck: async () => ({
         ok: false,
         summary: marker,
+        durationSeconds: 1800,
+      }),
+      suggestAlternativeRoute: async () => ({
+        id: "alt-1",
+        label: "25 min",
+        durationSeconds: 1500,
+        savingsSeconds: 300,
+        payload: {},
+        summary: "Saves about 5 min with 25 min",
       }),
       sendPushNotification: async () => {
         // This test only cares that the worker persists the disruption.

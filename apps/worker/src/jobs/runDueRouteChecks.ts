@@ -21,6 +21,7 @@ export interface RunDueChecksDeps {
   googleApiKey: string;
   now?: Date;
   evaluateRouteCheck?: typeof evaluateTransitRouteCheck;
+  suggestAlternativeRoute?: typeof suggestTransitAlternativeRoute;
   sendPushNotification?: typeof sendExpoPushNotification;
 }
 
@@ -30,6 +31,7 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
     googleApiKey,
     now = new Date(),
     evaluateRouteCheck = evaluateTransitRouteCheck,
+    suggestAlternativeRoute = suggestTransitAlternativeRoute,
     sendPushNotification = sendExpoPushNotification,
   } = deps;
 
@@ -151,7 +153,7 @@ export const runDueRouteChecks = async (deps: RunDueChecksDeps): Promise<void> =
       let suggestedAlternative: unknown = null;
       if (currentDurationSeconds !== undefined) {
         try {
-          const suggestion = await suggestTransitAlternativeRoute({
+          const suggestion = await suggestAlternativeRoute({
             apiKey: googleApiKey,
             origin: { lat: origin.lat, lng: origin.lng },
             destination: { lat: destination.lat, lng: destination.lng },
