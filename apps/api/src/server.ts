@@ -11,14 +11,10 @@ const startServer = async (): Promise<void> => {
   if (!jwtSecret) {
     throw new Error('JWT_SECRET is required');
   }
-  const googleRoutesApiKey = process.env.GOOGLE_ROUTES_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? '';
-  if (!googleRoutesApiKey) {
-    throw new Error('GOOGLE_API_KEY is required');
-  }
 
   await runMigrations(databaseUrl);
   const db = createDb(databaseUrl);
-  const app = buildApp({ db, jwtSecret, googleRoutesApiKey });
+  const app = buildApp({ db, jwtSecret });
 
   const host = process.env.API_HOST ?? '0.0.0.0';
   const port = Number(process.env.API_PORT ?? 3000);

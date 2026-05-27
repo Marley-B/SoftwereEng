@@ -18,7 +18,6 @@
     "@fastify/cors": "^10.0.1",
     "@fastify/sensible": "^6.0.0",
     "@route-helper/db": "workspace:*",
-    "@route-helper/google-routes": "workspace:*",
     "@route-helper/shared": "workspace:*",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.38.3",
