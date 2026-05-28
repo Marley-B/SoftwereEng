@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "ae6cbe34-830f-421c-92f5-ace1afbe9b0e"
+      }
+    },
+    "android": {
+      "package": "com.d.kalinskyy.routehelper"
+    }
+  }
+}
